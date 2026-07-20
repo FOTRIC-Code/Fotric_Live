@@ -1,0 +1,765 @@
+package com.irtek.live.ui.preview
+
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
+import android.os.Build
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.ShutterSpeed
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Thermostat
+import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import kotlinx.coroutines.CoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import android.widget.Toast
+import com.irtek.live.data.entity.AlarmMessage
+import com.irtek.live.ui.theme.AppColors
+import com.irtek.netsdk.NativeSDK
+import com.irtek.netsdk.NetSDKManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import java.io.File
+import java.nio.ByteBuffer
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+data class PreviewDevice(
+    val id: Long,
+    val name: String,
+    val ip: String,
+    val thumbnailPath: String
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PreviewScreen(
+    device: PreviewDevice,
+    alarms: List<AlarmMessage>,
+    captureDir: File,
+    recordDir: File,
+    onBack: () -> Unit,
+    onCalibrate: () -> Unit = {},
+    onViewAllAlarms: () -> Unit = {}
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var isFullscreen by remember { mutableStateOf(false) }
+    var currentBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var videoAspectRatio by remember { mutableFloatStateOf(4f / 3f) }
+    val activity = context as? Activity
+
+    var isRecording by remember { mutableStateOf(false) }
+    var activeStreamId by remember { mutableIntStateOf(101) }
+
+    var showPaletteMenu by remember { mutableStateOf(false) }
+    var paletteList by remember { mutableStateOf<JSONArray?>(null) }
+    var currentPaletteRefNo by remember { mutableIntStateOf(-1) }
+
+    val sdf = remember { java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()) }
+
+    DisposableEffect(Unit) {
+        NetSDKManager.setStreamFrameListener(object : NativeSDK.StreamFrameListener {
+            override fun onStreamFrame(
+                handle: Long, streamId: Int, streamType: Int,
+                width: Int, height: Int, data: ByteArray,
+                timestampUs: Long, keyFrame: Boolean
+            ) {
+                if (width <= 0 || height <= 0 || data.isEmpty()) return
+                try {
+                    val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    bmp.copyPixelsFromBuffer(ByteBuffer.wrap(data))
+                    currentBitmap = bmp
+                    videoAspectRatio = width.toFloat() / height.toFloat()
+                } catch (_: Exception) {}
+            }
+        })
+
+        onDispose {
+            NetSDKManager.setStreamFrameListener(null)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!captureDir.exists()) captureDir.mkdirs()
+        if (!recordDir.exists()) recordDir.mkdirs()
+        val streams = NetSDKManager.getStreams()
+        if (streams.isSuccess && streams.data != null && streams.data!!.length() > 0) {
+            val firstStream = streams.data!!.getJSONObject(0)
+            activeStreamId = firstStream.optInt("id", 101)
+            val w = firstStream.optInt("resolution_width", 0)
+            val h = firstStream.optInt("resolution_height", 0)
+            if (w > 0 && h > 0) {
+                videoAspectRatio = w.toFloat() / h.toFloat()
+            }
+            NetSDKManager.startStream(activeStreamId, 2)
+        }
+    }
+
+    if (isFullscreen) {
+        FullscreenVideoView(
+            bitmap = currentBitmap,
+            onExit = {
+                isFullscreen = false
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                showSystemBars(activity)
+            }
+        )
+        return
+    }
+
+    Scaffold(
+        containerColor = AppColors.Background,
+        topBar = { PreviewTopBar(device.name, isRecording, onBack) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+        ) {
+            VideoPreviewArea(
+                bitmap = currentBitmap,
+                aspectRatio = videoAspectRatio,
+                onFullscreen = {
+                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    hideSystemBars(activity)
+                    isFullscreen = true
+                }
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            ActionButtonsCard(
+                onCapture = {
+                    scope.launch {
+                        val ts = sdf.format(java.util.Date())
+                        val file = File(captureDir, "IMG_${ts}.jpg")
+                        val result = withContext(Dispatchers.IO) {
+                            NetSDKManager.getThermalCapture(0, file.absolutePath)
+                        }
+                        Toast.makeText(
+                            context,
+                            if (result.isSuccess) "已保存: ${file.name}" else "抓图失败",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                },
+                onRecord = {
+                    scope.launch {
+                        if (isRecording) {
+                            withContext(Dispatchers.IO) {
+                                NetSDKManager.stopStreamRecord(activeStreamId)
+                            }
+                            isRecording = false
+                            Toast.makeText(context, "录像已保存", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val ts = sdf.format(java.util.Date())
+                            val file = File(recordDir, "VID_${ts}.mp4")
+                            val result = withContext(Dispatchers.IO) {
+                                NetSDKManager.startStreamRecord(activeStreamId, file.absolutePath)
+                            }
+                            if (result.isSuccess) {
+                                isRecording = true
+                                Toast.makeText(context, "开始录像", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "录像失败", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                },
+                isRecording = isRecording,
+                onCalibrate = onCalibrate,
+                showPaletteMenu = showPaletteMenu,
+                paletteList = paletteList,
+                currentPaletteRefNo = currentPaletteRefNo,
+                onPaletteClick = {
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            NetSDKManager.getThermalPresetPalettes()
+                        }
+                        if (result.isSuccess && result.data != null) {
+                            paletteList = result.data
+                        }
+                        val cur = withContext(Dispatchers.IO) {
+                            NetSDKManager.getThermalPalette()
+                        }
+                        if (cur.isSuccess && cur.data != null) {
+                            currentPaletteRefNo = cur.data!!.optInt("ref_no", -1)
+                        }
+                        showPaletteMenu = true
+                    }
+                },
+                onPaletteDismiss = { showPaletteMenu = false },
+                onPaletteSelect = { refNo ->
+                    showPaletteMenu = false
+                    currentPaletteRefNo = refNo
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            NetSDKManager.setThermalPalette("""{"ref_no":$refNo}""")
+                        }
+                    }
+                }
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            RecentAlarmsCard(alarms, onViewAllAlarms)
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+private fun hideSystemBars(activity: Activity?) {
+    activity?.window?.let { w ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            w.insetsController?.hide(
+                WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
+            )
+            w.insetsController?.systemBarsBehavior =
+                WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            @Suppress("DEPRECATION")
+            w.decorView.systemUiVisibility = (
+                android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
+        }
+    }
+}
+
+private fun showSystemBars(activity: Activity?) {
+    activity?.window?.let { w ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            w.insetsController?.show(
+                WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            w.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PreviewTopBar(deviceName: String, isRecording: Boolean, onBack: () -> Unit) {
+    TopAppBar(
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isRecording) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "rec")
+                    val alpha by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 0.2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(600),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "recAlpha"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(Color.Red.copy(alpha = alpha), CircleShape)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(
+                    deviceName,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    tint = AppColors.TextPrimary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = { }) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "更多",
+                    tint = AppColors.TextPrimary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.White,
+            scrolledContainerColor = Color.White
+        )
+    )
+}
+
+@Composable
+private fun VideoPreviewArea(
+    bitmap: Bitmap?,
+    aspectRatio: Float,
+    onFullscreen: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .aspectRatio(aspectRatio)
+            .background(Color(0xFF1A1A3E)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "热成像视频",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            CircularProgressIndicator(
+                color = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(36.dp),
+                strokeWidth = 3.dp
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color(0x99000000), RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onFullscreen),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Fullscreen,
+                    contentDescription = "全屏",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullscreenVideoView(
+    bitmap: Bitmap?,
+    onExit: () -> Unit
+) {
+    BackHandler { onExit() }
+
+    var showControls by remember { mutableStateOf(true) }
+    var controlsKey by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(controlsKey) {
+        if (showControls) {
+            delay(3000)
+            showControls = false
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                showControls = !showControls
+                if (showControls) controlsKey++
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "热成像视频",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            CircularProgressIndicator(
+                color = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(48.dp),
+                strokeWidth = 3.dp
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x40000000))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onExit) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "退出全屏",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionButtonsCard(
+    onCapture: () -> Unit,
+    onRecord: () -> Unit,
+    isRecording: Boolean,
+    onCalibrate: () -> Unit,
+    showPaletteMenu: Boolean,
+    paletteList: JSONArray?,
+    currentPaletteRefNo: Int,
+    onPaletteClick: () -> Unit,
+    onPaletteDismiss: () -> Unit,
+    onPaletteSelect: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ActionButton(Icons.Outlined.CameraAlt, "抓图", onCapture)
+            ActionButton(
+                Icons.Outlined.Videocam,
+                if (isRecording) "停止" else "录像",
+                onRecord,
+                tint = if (isRecording) Color.Red else AppColors.TextPrimary
+            )
+            Box {
+                ActionButton(Icons.Outlined.Palette, "调色板", onPaletteClick)
+                PaletteDropdown(
+                    expanded = showPaletteMenu,
+                    palettes = paletteList,
+                    currentRefNo = currentPaletteRefNo,
+                    onDismiss = onPaletteDismiss,
+                    onSelect = onPaletteSelect
+                )
+            }
+            ActionButton(Icons.Outlined.ShutterSpeed, "校准", onCalibrate)
+        }
+    }
+}
+
+@Composable
+private fun PaletteDropdown(
+    expanded: Boolean,
+    palettes: JSONArray?,
+    currentRefNo: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(10.dp),
+        containerColor = Color.White,
+        shadowElevation = 8.dp
+    ) {
+        if (palettes == null || palettes.length() == 0) {
+            DropdownMenuItem(
+                text = { Text("无可用调色板", fontSize = 13.sp, color = AppColors.TextSecondary) },
+                onClick = onDismiss
+            )
+        } else {
+            for (i in 0 until palettes.length()) {
+                val item = palettes.getJSONObject(i)
+                val refNo = item.optInt("ref_no", 0)
+                val name = item.optString("name", "Palette $refNo")
+                val isSelected = refNo == currentRefNo
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            name,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (isSelected) Color(0xFF2673F9) else AppColors.TextPrimary
+                        )
+                    },
+                    onClick = { onSelect(refNo) },
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                    modifier = Modifier.height(40.dp)
+                )
+                if (i < palettes.length() - 1) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        thickness = 0.5.dp,
+                        color = Color(0x0F1D2129)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    tint: Color = AppColors.TextPrimary
+) {
+    Column(
+        modifier = Modifier
+            .width(77.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .background(Color(0xFFF6F7F9), RoundedCornerShape(8.dp))
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            fontSize = 12.sp,
+            color = tint,
+            fontWeight = FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+private fun RecentAlarmsCard(
+    alarms: List<AlarmMessage>,
+    onViewAll: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "最近告警",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.TextPrimary
+                )
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(onClick = onViewAll),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "全部(${alarms.size})",
+                        fontSize = 12.sp,
+                        color = Color(0xFF0256FF),
+                        fontWeight = FontWeight.Normal
+                    )
+                    Icon(
+                        Icons.Outlined.ChevronRight,
+                        contentDescription = null,
+                        tint = Color(0xFF0256FF),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            if (alarms.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "暂无告警",
+                        fontSize = 13.sp,
+                        color = AppColors.TextSecondary
+                    )
+                }
+            } else {
+                alarms.take(3).forEachIndexed { index, alarm ->
+                    if (index > 0) {
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    AlarmItem(alarm)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlarmItem(alarm: AlarmMessage) {
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.White)
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 96.dp, height = 74.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF2A2D5E)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Outlined.Thermostat,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.4f),
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                alarm.title.ifBlank { "高温告警" },
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = AppColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.AccessTime,
+                    contentDescription = null,
+                    tint = AppColors.TextSecondary,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    dateFormat.format(Date(alarm.timestamp)),
+                    fontSize = 12.sp,
+                    color = AppColors.TextSecondary
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.Thermostat,
+                    contentDescription = null,
+                    tint = AppColors.TextSecondary,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    "${alarm.temperature}℃",
+                    fontSize = 12.sp,
+                    color = AppColors.TextSecondary
+                )
+            }
+        }
+    }
+}
