@@ -2,6 +2,9 @@ package com.irtek.live.ui.message
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -110,12 +113,15 @@ private fun MessageCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val bitmap = remember(item.thumbnailPath) {
-                if (item.thumbnailPath.isNotBlank()) {
-                    try {
-                        val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                        BitmapFactory.decodeFile(item.thumbnailPath, opts)?.asImageBitmap()
-                    } catch (_: Exception) { null }
+            var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+            LaunchedEffect(item.thumbnailPath) {
+                bitmap = if (item.thumbnailPath.isNotBlank()) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                            BitmapFactory.decodeFile(item.thumbnailPath, opts)?.asImageBitmap()
+                        } catch (_: Exception) { null }
+                    }
                 } else null
             }
 
@@ -127,9 +133,9 @@ private fun MessageCard(
                     .background(Color(0xFF2A2D5E)),
                 contentAlignment = Alignment.Center
             ) {
-                if (bitmap != null) {
+                bitmap?.let { bmp ->
                     Image(
-                        bitmap = bitmap,
+                        bitmap = bmp,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

@@ -30,13 +30,14 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_Live)
         super.onCreate(savedInstanceState)
         val db = (application as LiveApp).database
         enableEdgeToEdge()
         setContent {
             LiveTheme {
                 val scope = rememberCoroutineScope()
-                var screen by remember { mutableStateOf<Screen>(Screen.DeviceList) }
+                var screen by remember { mutableStateOf<Screen>(Screen.Splash) }
                 var selectedNav by remember { mutableIntStateOf(0) }
                 val captureDir = remember { File(filesDir, "captures") }
                 val recordDir = remember { File(filesDir, "records") }
@@ -115,6 +116,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (val s = screen) {
+                    is Screen.Splash -> {
+                        com.irtek.live.ui.splash.SplashScreen(
+                            onFinished = { screen = Screen.DeviceList }
+                        )
+                    }
                     is Screen.DeviceList -> {
                         DeviceListScreen(
                             devices = devices,
@@ -132,6 +138,9 @@ class MainActivity : ComponentActivity() {
                             onDeviceClick = { device ->
                                 val entity = deviceEntities.find { it.id.toString() == device.id }
                                 if (entity != null) {
+                                    screen = Screen.Preview(
+                                        entity.id, entity.name, entity.ip, entity.thumbnailPath
+                                    )
                                     scope.launch {
                                         withContext(Dispatchers.IO) {
                                             NetSDKManager.login(
@@ -140,9 +149,6 @@ class MainActivity : ComponentActivity() {
                                                 entity.password.ifBlank { "admin" }
                                             )
                                         }
-                                        screen = Screen.Preview(
-                                            entity.id, entity.name, entity.ip, entity.thumbnailPath
-                                        )
                                     }
                                 }
                             },
@@ -403,6 +409,7 @@ private suspend fun captureThumb(thumbDir: File, ip: String): String {
 }
 
 private sealed class Screen {
+    data object Splash : Screen()
     data object DeviceList : Screen()
     data object AddDevice : Screen()
     data object ManualAdd : Screen()

@@ -20,10 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalDensity
 import java.io.File
 import androidx.compose.ui.text.font.FontWeight
@@ -243,15 +247,18 @@ private fun DeviceCard(
                         .background(device.thumbnailColor),
                     contentAlignment = Alignment.Center
                 ) {
-                    val bitmap = remember(device.thumbnailPath, device.updatedAt) {
-                        if (device.thumbnailPath.isNotBlank()) {
-                            val f = File(device.thumbnailPath)
-                            if (f.exists()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
+                    var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+                    LaunchedEffect(device.thumbnailPath, device.updatedAt) {
+                        bitmap = if (device.thumbnailPath.isNotBlank()) {
+                            withContext(Dispatchers.IO) {
+                                val f = File(device.thumbnailPath)
+                                if (f.exists()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
+                            }
                         } else null
                     }
                     if (bitmap != null) {
                         androidx.compose.foundation.Image(
-                            bitmap = bitmap,
+                            bitmap = bitmap!!,
                             contentDescription = "设备截图",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()

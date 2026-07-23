@@ -125,16 +125,25 @@ fun PreviewScreen(
     LaunchedEffect(Unit) {
         if (!captureDir.exists()) captureDir.mkdirs()
         if (!recordDir.exists()) recordDir.mkdirs()
-        val streams = NetSDKManager.getStreams()
-        if (streams.isSuccess && streams.data != null && streams.data!!.length() > 0) {
-            val firstStream = streams.data!!.getJSONObject(0)
-            activeStreamId = firstStream.optInt("id", 101)
-            val w = firstStream.optInt("resolution_width", 0)
-            val h = firstStream.optInt("resolution_height", 0)
-            if (w > 0 && h > 0) {
-                videoAspectRatio = w.toFloat() / h.toFloat()
+        // Wait for login to complete (it runs concurrently from MainActivity)
+        withContext(Dispatchers.IO) {
+            var retries = 0
+            while (retries < 30) {
+                val streams = NetSDKManager.getStreams()
+                if (streams.isSuccess && streams.data != null && streams.data!!.length() > 0) {
+                    val firstStream = streams.data!!.getJSONObject(0)
+                    activeStreamId = firstStream.optInt("id", 101)
+                    val w = firstStream.optInt("resolution_width", 0)
+                    val h = firstStream.optInt("resolution_height", 0)
+                    if (w > 0 && h > 0) {
+                        videoAspectRatio = w.toFloat() / h.toFloat()
+                    }
+                    NetSDKManager.startStream(activeStreamId, 2)
+                    break
+                }
+                delay(200)
+                retries++
             }
-            NetSDKManager.startStream(activeStreamId, 2)
         }
     }
 

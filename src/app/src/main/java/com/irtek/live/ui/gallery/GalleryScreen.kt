@@ -4,6 +4,9 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.ImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -51,25 +54,28 @@ fun GalleryScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("全部", "图片", "视频")
 
-    val items = remember(selectedTab) {
-        val photos = if (captureDir.exists()) {
-            captureDir.listFiles()
-                ?.filter { it.extension.lowercase() in listOf("jpg", "jpeg", "png", "bmp") }
-                ?.map { GalleryItem(it, false, it.lastModified()) }
-                ?: emptyList()
-        } else emptyList()
+    var items by remember { mutableStateOf<List<GalleryItem>>(emptyList()) }
+    LaunchedEffect(selectedTab) {
+        items = withContext(Dispatchers.IO) {
+            val photos = if (captureDir.exists()) {
+                captureDir.listFiles()
+                    ?.filter { it.extension.lowercase() in listOf("jpg", "jpeg", "png", "bmp") }
+                    ?.map { GalleryItem(it, false, it.lastModified()) }
+                    ?: emptyList()
+            } else emptyList()
 
-        val videos = if (recordDir.exists()) {
-            recordDir.listFiles()
-                ?.filter { it.extension.lowercase() in listOf("mp4", "avi", "mkv") }
-                ?.map { GalleryItem(it, true, it.lastModified()) }
-                ?: emptyList()
-        } else emptyList()
+            val videos = if (recordDir.exists()) {
+                recordDir.listFiles()
+                    ?.filter { it.extension.lowercase() in listOf("mp4", "avi", "mkv") }
+                    ?.map { GalleryItem(it, true, it.lastModified()) }
+                    ?: emptyList()
+            } else emptyList()
 
-        when (selectedTab) {
-            1 -> photos.sortedByDescending { it.timestamp }
-            2 -> videos.sortedByDescending { it.timestamp }
-            else -> (photos + videos).sortedByDescending { it.timestamp }
+            when (selectedTab) {
+                1 -> photos.sortedByDescending { it.timestamp }
+                2 -> videos.sortedByDescending { it.timestamp }
+                else -> (photos + videos).sortedByDescending { it.timestamp }
+            }
         }
     }
 
@@ -176,23 +182,26 @@ private fun GalleryThumbnail(item: GalleryItem) {
             },
         contentAlignment = Alignment.Center
     ) {
-        val bitmap = remember(item.file.absolutePath, item.timestamp) {
-            try {
-                if (item.isVideo) {
-                    val retriever = MediaMetadataRetriever()
-                    retriever.setDataSource(item.file.absolutePath)
-                    val frame = retriever.frameAtTime
-                    retriever.release()
-                    frame?.asImageBitmap()
-                } else {
-                    val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
-                    BitmapFactory.decodeFile(item.file.absolutePath, opts)?.asImageBitmap()
-                }
-            } catch (_: Exception) { null }
+        var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+        LaunchedEffect(item.file.absolutePath, item.timestamp) {
+            bitmap = withContext(Dispatchers.IO) {
+                try {
+                    if (item.isVideo) {
+                        val retriever = MediaMetadataRetriever()
+                        retriever.setDataSource(item.file.absolutePath)
+                        val frame = retriever.frameAtTime
+                        retriever.release()
+                        frame?.asImageBitmap()
+                    } else {
+                        val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+                        BitmapFactory.decodeFile(item.file.absolutePath, opts)?.asImageBitmap()
+                    }
+                } catch (_: Exception) { null }
+            }
         }
-        if (bitmap != null) {
+        bitmap?.let { bmp ->
             Image(
-                bitmap = bitmap,
+                bitmap = bmp,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
