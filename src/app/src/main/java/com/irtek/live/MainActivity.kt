@@ -57,7 +57,6 @@ class MainActivity : ComponentActivity() {
                             model = e.model,
                             ip = e.ip,
                             sn = e.serialNo,
-                            channels = (1..e.channelCount).map { ChannelItem(it, "通道 $it") },
                             thumbnailPath = e.thumbnailPath,
                             updatedAt = e.updatedAt
                         )
@@ -152,11 +151,55 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             },
-                            onChannelPlay = { _, _ -> },
                             onDeleteDevice = { device ->
                                 scope.launch {
                                     withContext(Dispatchers.IO) {
                                         db.deviceDao().deleteById(device.id.toLong())
+                                    }
+                                }
+                            },
+                            onAlarmConfig = { device ->
+                                val entity = deviceEntities.find { it.id.toString() == device.id }
+                                if (entity != null) {
+                                    screen = Screen.AlarmConfig(entity.id, entity.name, entity.ip)
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            NetSDKManager.login(
+                                                entity.ip, entity.port,
+                                                entity.userName,
+                                                entity.password.ifBlank { "admin" }
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            onMaintenance = { device ->
+                                val entity = deviceEntities.find { it.id.toString() == device.id }
+                                if (entity != null) {
+                                    screen = Screen.Maintenance(entity.id, entity.name, entity.ip)
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            NetSDKManager.login(
+                                                entity.ip, entity.port,
+                                                entity.userName,
+                                                entity.password.ifBlank { "admin" }
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            onEditDevice = { device ->
+                                val entity = deviceEntities.find { it.id.toString() == device.id }
+                                if (entity != null) {
+                                    screen = Screen.EditDevice(entity.id, entity.name, entity.ip)
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            NetSDKManager.login(
+                                                entity.ip, entity.port,
+                                                entity.userName,
+                                                entity.password.ifBlank { "admin" }
+                                            )
+                                        }
                                     }
                                 }
                             },
@@ -248,6 +291,21 @@ class MainActivity : ComponentActivity() {
                             onBack = { leavePreview() },
                             onCalibrate = {
                                 scope.launch { NetSDKManager.thermalCalibrate() }
+                            },
+                            onEditDevice = {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        NetSDKManager.stopStream()
+                                    }
+                                }
+                                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                screen = Screen.EditDevice(
+                                    deviceId = s.deviceId,
+                                    name = s.name,
+                                    ip = s.ip,
+                                    fromPreview = true,
+                                    thumbnailPath = s.thumbnailPath
+                                )
                             }
                         )
                     }
@@ -264,6 +322,51 @@ class MainActivity : ComponentActivity() {
                                 }
                                 screen = Screen.DeviceList
                             }
+                        )
+                    }
+                    is Screen.AlarmConfig -> {
+                        BackHandler {
+                            scope.launch { NetSDKManager.logout() }
+                            screen = Screen.DeviceList
+                        }
+                        com.irtek.live.ui.alarm.AlarmConfigScreen(
+                            deviceIp = s.ip,
+                            deviceName = s.name,
+                            onBack = {
+                                scope.launch { NetSDKManager.logout() }
+                                screen = Screen.DeviceList
+                            }
+                        )
+                    }
+                    is Screen.Maintenance -> {
+                        BackHandler {
+                            scope.launch { NetSDKManager.logout() }
+                            screen = Screen.DeviceList
+                        }
+                        com.irtek.live.ui.maintenance.DeviceMaintenanceScreen(
+                            deviceIp = s.ip,
+                            deviceName = s.name,
+                            onBack = {
+                                scope.launch { NetSDKManager.logout() }
+                                screen = Screen.DeviceList
+                            }
+                        )
+                    }
+                    is Screen.EditDevice -> {
+                        val leaveEdit = {
+                            if (s.fromPreview) {
+                                // 保持登录，返回预览并重新拉流
+                                screen = Screen.Preview(s.deviceId, s.name, s.ip, s.thumbnailPath)
+                            } else {
+                                scope.launch { NetSDKManager.logout() }
+                                screen = Screen.DeviceList
+                            }
+                        }
+                        BackHandler { leaveEdit() }
+                        com.irtek.live.ui.edit.DeviceEditScreen(
+                            deviceIp = s.ip,
+                            deviceName = s.name,
+                            onBack = { leaveEdit() }
                         )
                     }
                 }
@@ -421,4 +524,13 @@ private sealed class Screen {
         val thumbnailPath: String
     ) : Screen()
     data class DeviceDetail(val ip: String) : Screen()
+    data class AlarmConfig(val deviceId: Long, val name: String, val ip: String) : Screen()
+    data class Maintenance(val deviceId: Long, val name: String, val ip: String) : Screen()
+    data class EditDevice(
+        val deviceId: Long,
+        val name: String,
+        val ip: String,
+        val fromPreview: Boolean = false,
+        val thumbnailPath: String = ""
+    ) : Screen()
 }

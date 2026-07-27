@@ -1,0 +1,537 @@
+package com.irtek.live.ui.alarm
+
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import android.util.Log
+import com.irtek.live.ui.theme.AppColors
+import com.irtek.netsdk.NetSDKManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+
+private val alarmTypeLabels = listOf(
+    "最高温大于阈值", "最高温小于阈值",
+    "最低温大于阈值", "最低温小于阈值",
+    "平均温大于阈值", "平均温小于阈值",
+    "温差大于阈值", "温差小于阈值"
+)
+
+private val markerTypeLabels = mapOf(
+    1 to "点", 3 to "矩形", 4 to "椭圆", 5 to "多边形", 6 to "折线"
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AlarmConfigScreen(
+    deviceIp: String,
+    deviceName: String,
+    onBack: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    var isLoading by remember { mutableStateOf(true) }
+
+    // Data from SDK
+    var markers by remember { mutableStateOf<JSONArray?>(null) }
+    var allAlarms by remember { mutableStateOf<JSONArray?>(null) }
+    var ftpEnabled by remember { mutableStateOf(false) }
+    var webhookEnabled by remember { mutableStateOf(false) }
+    var tempUnitSuffix by remember { mutableStateOf("℃") }
+
+    // Internal navigation: null = list page, String = marker detail
+    var selectedMarker by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val markersResult = NetSDKManager.getThermalMarkers()
+            if (markersResult.isSuccess && markersResult.data != null) {
+                markers = markersResult.data
+            }
+            val alarmsResult = NetSDKManager.getThermalAlarms()
+            if (alarmsResult.isSuccess && alarmsResult.data != null) {
+                allAlarms = alarmsResult.data
+            }
+            val triggerResult = NetSDKManager.getAlarmTrigger(1)
+            Log.d("AlarmConfig", "getAlarmTrigger result: success=${triggerResult.isSuccess}, code=${triggerResult.code}, msg=${triggerResult.message}, data=${triggerResult.data}")
+            if (triggerResult.isSuccess && triggerResult.data != null) {
+                ftpEnabled = triggerResult.data!!.optInt("trigger_ftp_enabled", 0) == 1
+                webhookEnabled = triggerResult.data!!.optInt("trigger_webhook_enabled", 0) == 1
+                Log.d("AlarmConfig", "Parsed: ftp=$ftpEnabled, webhook=$webhookEnabled")
+            }
+            val unitResult = NetSDKManager.getThermalUnit()
+            if (unitResult.isSuccess && unitResult.data != null) {
+                tempUnitSuffix = when (unitResult.data!!.optInt("temp_unit", 0)) {
+                    1 -> "K"
+                    2 -> "℉"
+                    else -> "℃"
+                }
+            }
+        }
+        isLoading = false
+    }
+
+    val markerNames = remember(markers) {
+        val list = mutableListOf("global")
+        if (markers != null) {
+            for (i in 0 until markers!!.length()) {
+                list.add(markers!!.getJSONObject(i).optString("name", "标识$i"))
+            }
+        }
+        list
+    }
+
+    if (selectedMarker != null) {
+        MarkerAlarmDetailScreen(
+            markerName = selectedMarker!!,
+            allAlarms = allAlarms,
+            tempUnit = tempUnitSuffix,
+            onBack = { selectedMarker = null },
+            onSave = { updatedAlarms ->
+                allAlarms = updatedAlarms
+                scope.launch {
+                    val r = NetSDKManager.setThermalAlarms(updatedAlarms.toString())
+                    val msg = if (r.isSuccess) "保存成功" else "保存失败"
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    if (r.isSuccess) selectedMarker = null
+                }
+            }
+        )
+        return
+    }
+
+    // ── Level 1: List page ──
+
+    BackHandler { onBack() }
+
+    Scaffold(
+        containerColor = Color(0xFFF4F5F9),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("报警配置", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回",
+                            tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
+                    }
+                },
+                actions = { Spacer(Modifier.width(48.dp)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF4F5F9))
+            )
+        }
+    ) { padding ->
+        if (isLoading) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color(0xFF2673F9), strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 12.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Spacer(Modifier.height(8.dp))
+
+                Text("报警联动", fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                    color = AppColors.TextSecondary,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp))
+
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(0.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        SwitchRow("FTP 上传", ftpEnabled) { newVal ->
+                            ftpEnabled = newVal
+                            scope.launch {
+                                val json = JSONObject().apply {
+                                    put("trigger_ftp_enabled", if (newVal) 1 else 0)
+                                    put("trigger_webhook_enabled", if (webhookEnabled) 1 else 0)
+                                }
+                                Log.d("AlarmConfig", "setAlarmTrigger FTP: ${json}")
+                                val r = NetSDKManager.setAlarmTrigger(1, json.toString())
+                                Log.d("AlarmConfig", "setAlarmTrigger result: success=${r.isSuccess}, code=${r.code}, msg=${r.message}")
+                            }
+                        }
+                        SettingDivider()
+                        SwitchRow("Webhook 推送", webhookEnabled) { newVal ->
+                            webhookEnabled = newVal
+                            scope.launch {
+                                val json = JSONObject().apply {
+                                    put("trigger_ftp_enabled", if (ftpEnabled) 1 else 0)
+                                    put("trigger_webhook_enabled", if (newVal) 1 else 0)
+                                }
+                                Log.d("AlarmConfig", "setAlarmTrigger Webhook: ${json}")
+                                val r = NetSDKManager.setAlarmTrigger(1, json.toString())
+                                Log.d("AlarmConfig", "setAlarmTrigger result: success=${r.isSuccess}, code=${r.code}, msg=${r.message}")
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // Card 2: Marker list (测温标识)
+                Text("测温标识", fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                    color = AppColors.TextSecondary,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp))
+
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(0.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        // Global alarm entry
+                        MarkerRow(
+                            name = "全局",
+                            typeLabel = null,
+                            alarmEnabled = isAlarmEnabled(allAlarms, "global"),
+                            onClick = { selectedMarker = "global" }
+                        )
+
+                        if (markers != null && markers!!.length() > 0) {
+                            for (i in 0 until markers!!.length()) {
+                                SettingDivider()
+                                val m = markers!!.getJSONObject(i)
+                                val mName = m.optString("name", "标识$i")
+                                val mType = markerTypeLabels[m.optInt("type", 0)] ?: "未知"
+                                MarkerRow(
+                                    name = mName,
+                                    typeLabel = mType,
+                                    alarmEnabled = isAlarmEnabled(allAlarms, mName),
+                                    onClick = { selectedMarker = mName }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+private fun isAlarmEnabled(alarms: JSONArray?, markerName: String): Boolean {
+    if (alarms == null) return false
+    for (i in 0 until alarms.length()) {
+        val obj = alarms.getJSONObject(i)
+        if (obj.optString("marker_name") == markerName) {
+            return obj.optInt("enabled", 0) == 1
+        }
+    }
+    return false
+}
+
+@Composable
+private fun MarkerRow(name: String, typeLabel: String?, alarmEnabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFFF0F2F5)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Outlined.Notifications, contentDescription = null,
+                tint = if (alarmEnabled) Color(0xFF2673F9) else AppColors.TextSecondary,
+                modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, fontSize = 15.sp, color = AppColors.TextPrimary,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (typeLabel != null) {
+                Text(typeLabel, fontSize = 12.sp, color = AppColors.TextSecondary)
+            }
+        }
+        Text(
+            if (alarmEnabled) "已启用" else "未启用",
+            fontSize = 13.sp,
+            color = if (alarmEnabled) Color(0xFF2673F9) else AppColors.TextSecondary
+        )
+        Spacer(Modifier.width(4.dp))
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null,
+            tint = AppColors.TextSecondary, modifier = Modifier.size(18.dp))
+    }
+}
+
+// ── Level 2: Marker alarm detail ──
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MarkerAlarmDetailScreen(
+    markerName: String,
+    allAlarms: JSONArray?,
+    tempUnit: String,
+    onBack: () -> Unit,
+    onSave: (JSONArray) -> Unit
+) {
+    BackHandler { onBack() }
+
+    val displayName = if (markerName == "global") "全局" else markerName
+
+    var alarmEnabled by remember { mutableStateOf(false) }
+    var alarmTypeIndex by remember { mutableIntStateOf(0) }
+    var alarmTemp by remember { mutableStateOf("80.0") }
+    var alarmDelay by remember { mutableStateOf("0") }
+    var thresholdTemp by remember { mutableStateOf("75.0") }
+    var thresholdDelay by remember { mutableStateOf("0") }
+    var triggerTemp by remember { mutableStateOf("90.0") }
+    var triggerDelay by remember { mutableStateOf("0") }
+    var showTypeMenu by remember { mutableStateOf(false) }
+
+    fun fmt1(v: Double) = "%.1f".format(v)
+
+    LaunchedEffect(Unit) {
+        if (allAlarms != null) {
+            for (i in 0 until allAlarms.length()) {
+                val obj = allAlarms.getJSONObject(i)
+                if (obj.optString("marker_name") == markerName) {
+                    alarmEnabled = obj.optInt("enabled", 0) == 1
+                    alarmTypeIndex = (obj.optInt("alarm_type", 1) - 1).coerceIn(0, 7)
+                    alarmTemp = fmt1(obj.optDouble("alarm_temp", 80.0))
+                    alarmDelay = obj.optInt("alarm_delay_time", 0).toString()
+                    thresholdTemp = fmt1(obj.optDouble("threshold_temp", 75.0))
+                    thresholdDelay = obj.optInt("threshold_delay_time", 0).toString()
+                    triggerTemp = fmt1(obj.optDouble("trigger_temp", 90.0))
+                    triggerDelay = obj.optInt("trigger_delay_time", 0).toString()
+                    break
+                }
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = Color(0xFFF4F5F9),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(displayName, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回",
+                            tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
+                    }
+                },
+                actions = { Spacer(Modifier.width(48.dp)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF4F5F9))
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 12.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(Modifier.height(8.dp))
+
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    SwitchRow("报警开关", alarmEnabled) { alarmEnabled = it }
+                    SettingDivider()
+                    Box {
+                        SettingRow("报警类型", alarmTypeLabels[alarmTypeIndex]) { showTypeMenu = true }
+                        DropdownMenu(
+                            expanded = showTypeMenu,
+                            onDismissRequest = { showTypeMenu = false }
+                        ) {
+                            alarmTypeLabels.forEachIndexed { i, label ->
+                                DropdownMenuItem(
+                                    text = { Text(label, fontSize = 14.sp) },
+                                    onClick = {
+                                        alarmTypeIndex = i
+                                        showTypeMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    SettingDivider()
+                    InputRow("报警温度", alarmTemp, tempUnit) { alarmTemp = it }
+                    SettingDivider()
+                    InputRow("报警延时", alarmDelay, "秒") { alarmDelay = it }
+                    SettingDivider()
+                    InputRow("二级预警温度", thresholdTemp, tempUnit) { thresholdTemp = it }
+                    SettingDivider()
+                    InputRow("二级预警延时", thresholdDelay, "秒") { thresholdDelay = it }
+                    SettingDivider()
+                    InputRow("一级预警温度", triggerTemp, tempUnit) { triggerTemp = it }
+                    SettingDivider()
+                    InputRow("一级预警延时", triggerDelay, "秒") { triggerDelay = it }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    val result = JSONArray()
+                    if (allAlarms != null) {
+                        for (i in 0 until allAlarms.length()) {
+                            val obj = allAlarms.getJSONObject(i)
+                            if (obj.optString("marker_name") == markerName) continue
+                            result.put(obj)
+                        }
+                    }
+                    result.put(JSONObject().apply {
+                        put("marker_name", markerName)
+                        put("enabled", if (alarmEnabled) 1 else 0)
+                        put("alarm_type", alarmTypeIndex + 1)
+                        put("alarm_temp", alarmTemp.toDoubleOrNull() ?: 80.0)
+                        put("alarm_delay_time", alarmDelay.toIntOrNull() ?: 0)
+                        put("threshold_temp", thresholdTemp.toDoubleOrNull() ?: 75.0)
+                        put("threshold_delay_time", thresholdDelay.toIntOrNull() ?: 0)
+                        put("trigger_temp", triggerTemp.toDoubleOrNull() ?: 90.0)
+                        put("trigger_delay_time", triggerDelay.toIntOrNull() ?: 0)
+                    })
+                    onSave(result)
+                },
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2673F9))
+            ) {
+                Text("保存设置", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+// ── Shared composables ──
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Color(0xFF2673F9),
+                uncheckedTrackColor = Color(0xFFE0E0E0)
+            )
+        )
+    }
+}
+
+@Composable
+private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+        Text(value, fontSize = 14.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.width(4.dp))
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null,
+            tint = AppColors.TextSecondary, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun InputRow(label: String, value: String, suffix: String, onValueChange: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            textStyle = TextStyle(
+                fontSize = 14.sp,
+                color = AppColors.TextPrimary,
+                textAlign = TextAlign.End
+            ),
+            modifier = Modifier.width(80.dp),
+            decorationBox = { innerTextField ->
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    innerTextField()
+                }
+            }
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(suffix, fontSize = 13.sp, color = AppColors.TextSecondary)
+    }
+}
+
+@Composable
+private fun SettingDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 20.dp),
+        thickness = 0.5.dp,
+        color = Color(0x0F1D2129)
+    )
+}

@@ -41,8 +41,6 @@ import com.irtek.live.ui.theme.AppTypo
 
 enum class DeviceStatus { ONLINE, OFFLINE, ALARM }
 
-data class ChannelItem(val id: Int, val name: String)
-
 data class DeviceItem(
     val id: String,
     val name: String,
@@ -50,7 +48,6 @@ data class DeviceItem(
     val model: String,
     val ip: String,
     val sn: String,
-    val channels: List<ChannelItem>,
     val thumbnailPath: String = "",
     val updatedAt: Long = 0L,
     val thumbnailColor: Color = Color(0xFF1A237E)
@@ -65,8 +62,10 @@ fun DeviceListScreen(
     onRefresh: () -> Unit = {},
     onAddDevice: () -> Unit = {},
     onDeviceClick: (DeviceItem) -> Unit = {},
-    onChannelPlay: (DeviceItem, ChannelItem) -> Unit = { _, _ -> },
     onDeleteDevice: (DeviceItem) -> Unit = {},
+    onEditDevice: (DeviceItem) -> Unit = {},
+    onAlarmConfig: (DeviceItem) -> Unit = {},
+    onMaintenance: (DeviceItem) -> Unit = {},
     onNavSelect: (Int) -> Unit = {},
     messageContent: @Composable () -> Unit = {},
     galleryContent: @Composable () -> Unit = {},
@@ -87,12 +86,23 @@ fun DeviceListScreen(
     }
 
     val filteredDevices = remember(devices, selectedTab) {
-        when (selectedTab) {
+        val filtered = when (selectedTab) {
             1 -> devices.filter { it.status == DeviceStatus.ONLINE }
             2 -> devices.filter { it.status == DeviceStatus.OFFLINE }
             3 -> devices.filter { it.status == DeviceStatus.ALARM }
             else -> devices
         }
+        filtered.sortedWith(
+            compareBy<DeviceItem> {
+                when (it.status) {
+                    DeviceStatus.ONLINE -> 0
+                    DeviceStatus.ALARM -> 1
+                    DeviceStatus.OFFLINE -> 2
+                }
+            }
+                .thenBy { it.name.lowercase() }
+                .thenBy { it.sn.lowercase() }
+        )
     }
 
     val pullState = rememberPullToRefreshState()
@@ -147,8 +157,10 @@ fun DeviceListScreen(
                         DeviceCard(
                             device = device,
                             onClick = { onDeviceClick(device) },
-                            onChannelPlay = { ch -> onChannelPlay(device, ch) },
-                            onDelete = { onDeleteDevice(device) }
+                            onDelete = { onDeleteDevice(device) },
+                            onEditDevice = { onEditDevice(device) },
+                            onAlarmConfig = { onAlarmConfig(device) },
+                            onMaintenance = { onMaintenance(device) }
                         )
                     }
                 }
@@ -221,8 +233,10 @@ private fun FilterTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Uni
 private fun DeviceCard(
     device: DeviceItem,
     onClick: () -> Unit,
-    onChannelPlay: (ChannelItem) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEditDevice: () -> Unit = {},
+    onAlarmConfig: () -> Unit = {},
+    onMaintenance: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -323,28 +337,14 @@ private fun DeviceCard(
                     DevicePopupMenu(
                         expanded = showMenu,
                         onDismiss = { showMenu = false },
-                        onEditDevice = { showMenu = false },
-                        onAlarmConfig = { showMenu = false },
-                        onMaintenance = { showMenu = false },
+                        onEditDevice = { showMenu = false; onEditDevice() },
+                        onAlarmConfig = { showMenu = false; onAlarmConfig() },
+                        onMaintenance = { showMenu = false; onMaintenance() },
                         onDelete = { showMenu = false; onDelete() }
                     )
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            // Channel buttons
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                device.channels.forEach { channel ->
-                    ChannelButton(
-                        channel = channel,
-                        onClick = { onChannelPlay(channel) },
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                }
-            }
         }
     }
 }
@@ -416,40 +416,6 @@ private fun StatusBadge(status: DeviceStatus) {
         contentAlignment = Alignment.Center
     ) {
         Text(text, fontSize = AppTypo.BadgeSize, color = textColor, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun ChannelButton(channel: ChannelItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(AppSpacing.ChannelBtnCorner)
-    Box(
-        modifier = modifier
-            .height(AppSpacing.ChannelBtnHeight)
-            .background(AppColors.ButtonBg, shape)
-            .border(0.5.dp, AppColors.ButtonBorder, shape)
-            .clip(shape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                channel.name,
-                fontSize = AppTypo.ChannelBtn,
-                color = AppColors.TextPrimary,
-                fontWeight = FontWeight.Normal,
-                lineHeight = AppTypo.ChannelBtn
-            )
-            Spacer(Modifier.width(2.dp))
-            Icon(
-                Icons.Default.PlayArrow,
-                contentDescription = "播放",
-                tint = AppColors.TextPrimary,
-                modifier = Modifier.size(14.dp)
-            )
-        }
     }
 }
 

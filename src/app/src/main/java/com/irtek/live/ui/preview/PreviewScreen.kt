@@ -82,6 +82,7 @@ fun PreviewScreen(
     recordDir: File,
     onBack: () -> Unit,
     onCalibrate: () -> Unit = {},
+    onEditDevice: () -> Unit = {},
     onViewAllAlarms: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
@@ -161,7 +162,7 @@ fun PreviewScreen(
 
     Scaffold(
         containerColor = AppColors.Background,
-        topBar = { PreviewTopBar(device.name, isRecording, onBack) }
+        topBar = { PreviewTopBar(device.name, isRecording, onBack, onEditDevice) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -299,7 +300,12 @@ private fun showSystemBars(activity: Activity?) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PreviewTopBar(deviceName: String, isRecording: Boolean, onBack: () -> Unit) {
+private fun PreviewTopBar(
+    deviceName: String,
+    isRecording: Boolean,
+    onBack: () -> Unit,
+    onEditDevice: () -> Unit = {}
+) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -342,10 +348,10 @@ private fun PreviewTopBar(deviceName: String, isRecording: Boolean, onBack: () -
             }
         },
         actions = {
-            IconButton(onClick = { }) {
+            IconButton(onClick = onEditDevice) {
                 Icon(
                     Icons.Default.MoreVert,
-                    contentDescription = "更多",
+                    contentDescription = "设备配置",
                     tint = AppColors.TextPrimary,
                     modifier = Modifier.size(22.dp)
                 )
