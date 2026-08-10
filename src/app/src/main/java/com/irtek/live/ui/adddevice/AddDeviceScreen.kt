@@ -15,9 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,7 +36,7 @@ fun AddDeviceScreen(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
-                            "添加设备",
+                            stringResource(R.string.add_title),
                             fontSize = 17.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextPrimary
@@ -45,7 +47,7 @@ fun AddDeviceScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary,
                             modifier = Modifier.size(22.dp)
                         )
@@ -66,7 +68,7 @@ fun AddDeviceScreen(
         ) {
             Spacer(Modifier.height(8.dp))
 
-            // Card 1 - 添加方式
+            // Card 1 - Add method
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -75,7 +77,7 @@ fun AddDeviceScreen(
             ) {
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)) {
                     Text(
-                        "添加方式",
+                        stringResource(R.string.add_method),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
                         color = AppColors.TextPrimary
@@ -85,8 +87,8 @@ fun AddDeviceScreen(
 
                     AddMethodRow(
                         icon = Icons.Outlined.Edit,
-                        title = "手动添加",
-                        subtitle = "手动输入设备信息进行添加",
+                        title = stringResource(R.string.add_manual),
+                        subtitle = stringResource(R.string.add_manual_desc),
                         onClick = onManualAdd
                     )
 
@@ -98,8 +100,8 @@ fun AddDeviceScreen(
 
                     AddMethodRow(
                         icon = Icons.Outlined.Wifi,
-                        title = "在线添加",
-                        subtitle = "在局域网中搜索并添加可用设备",
+                        title = stringResource(R.string.add_online),
+                        subtitle = stringResource(R.string.add_online_desc),
                         onClick = onOnlineAdd
                     )
 
@@ -109,7 +111,7 @@ fun AddDeviceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Card 2 - 温馨提醒
+            // Card 2 - Warm tip
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -129,14 +131,14 @@ fun AddDeviceScreen(
                     Spacer(Modifier.width(10.dp))
                     Column {
                         Text(
-                            "温馨提醒",
+                            stringResource(R.string.common_warm_tip),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextPrimary
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "请确保手机与设备连接到同一局域网，以便搜索到设备并完成添加。",
+                            stringResource(R.string.add_lan_tip),
                             fontSize = 13.sp,
                             color = AppColors.TextSecondary,
                             lineHeight = 20.sp

@@ -43,9 +43,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.Dispatchers
@@ -161,7 +163,7 @@ fun ThermalOsdConfigPage(onBack: () -> Unit) {
         scope.launch {
             val r = withContext(Dispatchers.IO) { NetSDKManager.setThermalOverlay(json) }
             if (!r.isSuccess) {
-                Toast.makeText(context, "设置失败: ${r.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.common_set_failed_fmt, r.message), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -193,14 +195,14 @@ fun ThermalOsdConfigPage(onBack: () -> Unit) {
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("热像 OSD", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text(stringResource(R.string.edit_thermal_osd), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary,
                             modifier = Modifier.size(22.dp)
                         )
@@ -225,27 +227,27 @@ fun ThermalOsdConfigPage(onBack: () -> Unit) {
             ) {
                 Spacer(Modifier.height(8.dp))
 
-                SectionTitle("显示开关")
+                SectionTitle(stringResource(R.string.edit_display_switch))
                 ThermalCard {
-                    SwitchRow("单位", unitOv.enabled) {
+                    SwitchRow(stringResource(R.string.edit_unit_label), unitOv.enabled) {
                         val updated = unitOv.copy(enabled = it)
                         unitOv = updated
                         pushThermalOverlay(unit = updated)
                     }
                     ThermalDivider()
-                    SwitchRow("调色板", pltOv.enabled) {
+                    SwitchRow(stringResource(R.string.edit_palette_label), pltOv.enabled) {
                         val updated = pltOv.copy(enabled = it)
                         pltOv = updated
                         pushThermalOverlay(plt = updated)
                     }
                     ThermalDivider()
-                    SwitchRow("测温参数", paramsOv.enabled) {
+                    SwitchRow(stringResource(R.string.edit_measure_params), paramsOv.enabled) {
                         val updated = paramsOv.copy(enabled = it)
                         paramsOv = updated
                         pushThermalOverlay(params = updated)
                     }
                     ThermalDivider()
-                    SwitchRow("报警信息", alarmOv.enabled) {
+                    SwitchRow(stringResource(R.string.edit_alarm_info), alarmOv.enabled) {
                         val updated = alarmOv.copy(enabled = it)
                         alarmOv = updated
                         pushThermalOverlay(alarm = updated)
@@ -254,40 +256,40 @@ fun ThermalOsdConfigPage(onBack: () -> Unit) {
 
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle("全局温度")
+                SectionTitle(stringResource(R.string.edit_global_temp))
                 ThermalCard {
-                    SwitchRow("显示全局温度", globalOv.enabled) {
+                    SwitchRow(stringResource(R.string.edit_show_global_temp), globalOv.enabled) {
                         val updated = globalOv.copy(enabled = it)
                         globalOv = updated
                         pushThermalOverlay(global = updated)
                     }
                     if (globalOv.enabled) {
                         ThermalDivider()
-                        SwitchRow("跟随标识", globalOv.follow) {
+                        SwitchRow(stringResource(R.string.edit_follow_marker), globalOv.follow) {
                             val updated = globalOv.copy(follow = it)
                             globalOv = updated
                             pushThermalOverlay(global = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("最高温", globalOv.maxEnabled) {
+                        SwitchRow(stringResource(R.string.edit_temp_max), globalOv.maxEnabled) {
                             val updated = globalOv.copy(maxEnabled = it)
                             globalOv = updated
                             pushThermalOverlay(global = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("最低温", globalOv.minEnabled) {
+                        SwitchRow(stringResource(R.string.edit_temp_min), globalOv.minEnabled) {
                             val updated = globalOv.copy(minEnabled = it)
                             globalOv = updated
                             pushThermalOverlay(global = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("平均温", globalOv.avgEnabled) {
+                        SwitchRow(stringResource(R.string.edit_temp_avg), globalOv.avgEnabled) {
                             val updated = globalOv.copy(avgEnabled = it)
                             globalOv = updated
                             pushThermalOverlay(global = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("发射率", globalOv.emissivityEnabled) {
+                        SwitchRow(stringResource(R.string.edit_emissivity), globalOv.emissivityEnabled) {
                             val updated = globalOv.copy(emissivityEnabled = it)
                             globalOv = updated
                             pushThermalOverlay(global = updated)
@@ -297,40 +299,40 @@ fun ThermalOsdConfigPage(onBack: () -> Unit) {
 
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle("测温区域")
+                SectionTitle(stringResource(R.string.edit_measure_area))
                 ThermalCard {
-                    SwitchRow("显示测温区域温度", markerOv.enabled) {
+                    SwitchRow(stringResource(R.string.edit_show_area_temp), markerOv.enabled) {
                         val updated = markerOv.copy(enabled = it)
                         markerOv = updated
                         pushThermalOverlay(marker = updated)
                     }
                     if (markerOv.enabled) {
                         ThermalDivider()
-                        SwitchRow("跟随标识", markerOv.follow) {
+                        SwitchRow(stringResource(R.string.edit_follow_marker), markerOv.follow) {
                             val updated = markerOv.copy(follow = it)
                             markerOv = updated
                             pushThermalOverlay(marker = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("最高温", markerOv.maxEnabled) {
+                        SwitchRow(stringResource(R.string.edit_temp_max), markerOv.maxEnabled) {
                             val updated = markerOv.copy(maxEnabled = it)
                             markerOv = updated
                             pushThermalOverlay(marker = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("最低温", markerOv.minEnabled) {
+                        SwitchRow(stringResource(R.string.edit_temp_min), markerOv.minEnabled) {
                             val updated = markerOv.copy(minEnabled = it)
                             markerOv = updated
                             pushThermalOverlay(marker = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("平均温", markerOv.avgEnabled) {
+                        SwitchRow(stringResource(R.string.edit_temp_avg), markerOv.avgEnabled) {
                             val updated = markerOv.copy(avgEnabled = it)
                             markerOv = updated
                             pushThermalOverlay(marker = updated)
                         }
                         ThermalDivider()
-                        SwitchRow("发射率", markerOv.emissivityEnabled) {
+                        SwitchRow(stringResource(R.string.edit_emissivity), markerOv.emissivityEnabled) {
                             val updated = markerOv.copy(emissivityEnabled = it)
                             markerOv = updated
                             pushThermalOverlay(marker = updated)

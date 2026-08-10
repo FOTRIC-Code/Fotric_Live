@@ -1,11 +1,16 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.irtek.live.ui.gallery
 
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -16,11 +21,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,9 +39,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.live.ui.theme.AppSpacing
 import com.irtek.live.ui.theme.AppTypo
@@ -55,33 +66,58 @@ fun GalleryScreen(
     recordDir: File
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("全部", "图片", "视频")
+    val tabs = listOf(
+        stringResource(R.string.gallery_tab_all),
+        stringResource(R.string.gallery_tab_photo),
+        stringResource(R.string.gallery_tab_video)
+    )
 
     var items by remember { mutableStateOf<List<GalleryItem>>(emptyList()) }
     var previewIndex by remember { mutableStateOf<Int?>(null) }
+    var selecting by remember { mutableStateOf(false) }
+    var selectedPaths by remember { mutableStateOf(setOf<String>()) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var refreshKey by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(selectedTab) {
+    suspend fun loadItems(tab: Int): List<GalleryItem> = withContext(Dispatchers.IO) {
+        val photos = if (captureDir.exists()) {
+            captureDir.listFiles()
+                ?.filter { it.extension.lowercase() in listOf("jpg", "jpeg", "png", "bmp") }
+                ?.map { GalleryItem(it, false, it.lastModified()) }
+                ?: emptyList()
+        } else emptyList()
+
+        val videos = if (recordDir.exists()) {
+            recordDir.listFiles()
+                ?.filter { it.extension.lowercase() in listOf("mp4", "avi", "mkv") }
+                ?.map { GalleryItem(it, true, it.lastModified()) }
+                ?: emptyList()
+        } else emptyList()
+
+        when (tab) {
+            1 -> photos.sortedByDescending { it.timestamp }
+            2 -> videos.sortedByDescending { it.timestamp }
+            else -> (photos + videos).sortedByDescending { it.timestamp }
+        }
+    }
+
+    LaunchedEffect(selectedTab, refreshKey) {
         previewIndex = null
-        items = withContext(Dispatchers.IO) {
-            val photos = if (captureDir.exists()) {
-                captureDir.listFiles()
-                    ?.filter { it.extension.lowercase() in listOf("jpg", "jpeg", "png", "bmp") }
-                    ?.map { GalleryItem(it, false, it.lastModified()) }
-                    ?: emptyList()
-            } else emptyList()
+        items = loadItems(selectedTab)
+        val valid = items.map { it.file.absolutePath }.toSet()
+        selectedPaths = selectedPaths.filter { it in valid }.toSet()
+        if (selecting && items.isEmpty()) {
+            selecting = false
+            selectedPaths = emptySet()
+        }
+    }
 
-            val videos = if (recordDir.exists()) {
-                recordDir.listFiles()
-                    ?.filter { it.extension.lowercase() in listOf("mp4", "avi", "mkv") }
-                    ?.map { GalleryItem(it, true, it.lastModified()) }
-                    ?: emptyList()
-            } else emptyList()
-
-            when (selectedTab) {
-                1 -> photos.sortedByDescending { it.timestamp }
-                2 -> videos.sortedByDescending { it.timestamp }
-                else -> (photos + videos).sortedByDescending { it.timestamp }
-            }
+    if (previewIndex != null) {
+        BackHandler { previewIndex = null }
+    } else if (selecting) {
+        BackHandler {
+            selecting = false
+            selectedPaths = emptySet()
         }
     }
 
@@ -91,20 +127,27 @@ fun GalleryScreen(
                 .fillMaxSize()
                 .background(AppColors.Background)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .padding(start = 16.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "图库",
-                    fontSize = AppTypo.TitleSize,
-                    fontWeight = FontWeight.Bold,
-                    color = AppColors.TextPrimary
-                )
-            }
+            GalleryTopBar(
+                selecting = selecting,
+                selectedCount = selectedPaths.size,
+                totalCount = items.size,
+                canSelect = items.isNotEmpty(),
+                onEnterSelect = { selecting = true },
+                onCancelSelect = {
+                    selecting = false
+                    selectedPaths = emptySet()
+                },
+                onToggleSelectAll = {
+                    selectedPaths = if (selectedPaths.size == items.size) {
+                        emptySet()
+                    } else {
+                        items.map { it.file.absolutePath }.toSet()
+                    }
+                },
+                onDeleteClick = {
+                    if (selectedPaths.isNotEmpty()) confirmDelete = true
+                }
+            )
 
             Spacer(Modifier.height(12.dp))
 
@@ -121,7 +164,9 @@ fun GalleryScreen(
                         color = if (isSelected) AppColors.TabSelectedBg else AppColors.TabUnselectedBg,
                         modifier = Modifier
                             .height(AppSpacing.TabHeight)
-                            .clickable { selectedTab = index }
+                            .clickable(enabled = !selecting) {
+                                selectedTab = index
+                            }
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -145,7 +190,7 @@ fun GalleryScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("暂无内容", fontSize = 15.sp, color = AppColors.TextSecondary)
+                    Text(stringResource(R.string.gallery_empty), fontSize = 15.sp, color = AppColors.TextSecondary)
                 }
             } else {
                 LazyVerticalGrid(
@@ -156,7 +201,30 @@ fun GalleryScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     itemsIndexed(items, key = { _, item -> item.file.absolutePath }) { index, item ->
-                        GalleryThumbnail(item) { previewIndex = index }
+                        val path = item.file.absolutePath
+                        val selected = path in selectedPaths
+                        GalleryThumbnail(
+                            item = item,
+                            selecting = selecting,
+                            selected = selected,
+                            onClick = {
+                                if (selecting) {
+                                    selectedPaths = if (selected) {
+                                        selectedPaths - path
+                                    } else {
+                                        selectedPaths + path
+                                    }
+                                } else {
+                                    previewIndex = index
+                                }
+                            },
+                            onLongClick = {
+                                if (!selecting) {
+                                    selecting = true
+                                    selectedPaths = setOf(path)
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -172,10 +240,104 @@ fun GalleryScreen(
             }
         }
     }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.gallery_delete_title)) },
+            text = { Text(String.format(stringResource(R.string.gallery_delete_confirm), selectedPaths.size)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val paths = selectedPaths.toList()
+                        confirmDelete = false
+                        selecting = false
+                        selectedPaths = emptySet()
+                        paths.forEach { path ->
+                            runCatching { File(path).delete() }
+                        }
+                        refreshKey++
+                    }
+                ) { Text(stringResource(R.string.common_delete), color = Color(0xFFDC2626)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
+    }
 }
 
 @Composable
-private fun GalleryThumbnail(item: GalleryItem, onClick: () -> Unit) {
+private fun GalleryTopBar(
+    selecting: Boolean,
+    selectedCount: Int,
+    totalCount: Int,
+    canSelect: Boolean,
+    onEnterSelect: () -> Unit,
+    onCancelSelect: () -> Unit,
+    onToggleSelectAll: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (selecting) {
+            TextButton(onClick = onCancelSelect) {
+                Text(stringResource(R.string.common_cancel), color = AppColors.TextPrimary)
+            }
+            Text(
+                String.format(stringResource(R.string.common_selected_count), selectedCount),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.TextPrimary,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onToggleSelectAll) {
+                Text(
+                    if (selectedCount == totalCount && totalCount > 0) stringResource(R.string.common_deselect_all) else stringResource(R.string.common_select_all),
+                    color = Color(0xFF0256FF)
+                )
+            }
+            TextButton(
+                onClick = onDeleteClick,
+                enabled = selectedCount > 0
+            ) {
+                Text(
+                    stringResource(R.string.common_delete),
+                    color = if (selectedCount > 0) Color(0xFFDC2626) else AppColors.TextSecondary
+                )
+            }
+        } else {
+            Text(
+                stringResource(R.string.nav_gallery),
+                fontSize = AppTypo.TitleSize,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextPrimary,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 8.dp)
+            )
+            if (canSelect) {
+                TextButton(onClick = onEnterSelect) {
+                    Text(stringResource(R.string.common_select), color = Color(0xFF0256FF))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GalleryThumbnail(
+    item: GalleryItem,
+    selecting: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
 
     Box(
@@ -183,7 +345,14 @@ private fun GalleryThumbnail(item: GalleryItem, onClick: () -> Unit) {
             .aspectRatio(1f)
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF2A2D5E))
-            .clickable(onClick = onClick),
+            .then(
+                if (selected) Modifier.border(2.dp, Color(0xFF0256FF), RoundedCornerShape(6.dp))
+                else Modifier
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -204,7 +373,7 @@ private fun GalleryThumbnail(item: GalleryItem, onClick: () -> Unit) {
         if (item.isVideo) {
             Icon(
                 Icons.Default.PlayCircle,
-                contentDescription = "视频",
+                contentDescription = stringResource(R.string.common_video),
                 tint = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.size(32.dp)
             )
@@ -220,6 +389,18 @@ private fun GalleryThumbnail(item: GalleryItem, onClick: () -> Unit) {
                     color = Color.White.copy(alpha = 0.8f)
                 )
             }
+        }
+
+        if (selecting) {
+            Icon(
+                imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                contentDescription = null,
+                tint = if (selected) Color(0xFF0256FF) else Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(22.dp)
+            )
         }
     }
 }
@@ -291,7 +472,7 @@ private fun GalleryPreview(
                     ) {
                         Icon(
                             Icons.Default.PlayCircle,
-                            contentDescription = "播放",
+                            contentDescription = stringResource(R.string.common_play),
                             tint = Color.White.copy(alpha = 0.9f),
                             modifier = Modifier.fillMaxSize()
                         )
@@ -312,7 +493,7 @@ private fun GalleryPreview(
             IconButton(onClick = onClose) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
+                    contentDescription = stringResource(R.string.common_back),
                     tint = Color.White
                 )
             }

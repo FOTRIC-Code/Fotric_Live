@@ -13,10 +13,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.launch
@@ -36,18 +38,21 @@ fun ManualAddScreen(
     var isConnecting by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
+    val ipRequiredMsg = stringResource(R.string.add_error_ip_required)
+    val connectFailedFmt = stringResource(R.string.add_error_connect_failed)
+
     Scaffold(
         containerColor = Color(0xFFF4F5F9),
         topBar = {
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("添加设备", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text(stringResource(R.string.add_title), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
                     }
                 },
                 actions = { Spacer(Modifier.width(48.dp)) },
@@ -71,15 +76,15 @@ fun ManualAddScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
-                    FormRow("设备名称", deviceName, "请输入设备名称") { deviceName = it }
+                    FormRow(stringResource(R.string.common_device_name), deviceName, stringResource(R.string.add_hint_name)) { deviceName = it }
                     FormDivider()
-                    FormRow("IP 地址", ipAddress, "例如：192.168.1.101") { ipAddress = it }
+                    FormRow(stringResource(R.string.common_ip_address), ipAddress, stringResource(R.string.add_hint_ip)) { ipAddress = it }
                     FormDivider()
-                    FormRow("端口号", port, "例如：80") { port = it }
+                    FormRow(stringResource(R.string.common_port), port, stringResource(R.string.add_hint_port)) { port = it }
                     FormDivider()
-                    FormRow("用户名", userName, "例如：admin") { userName = it }
+                    FormRow(stringResource(R.string.common_username), userName, stringResource(R.string.add_hint_user)) { userName = it }
                     FormDivider()
-                    FormRow("密码", password, "请输入密码") { password = it }
+                    FormRow(stringResource(R.string.common_password), password, stringResource(R.string.add_hint_password)) { password = it }
                 }
             }
 
@@ -98,7 +103,7 @@ fun ManualAddScreen(
 
             Button(
                 onClick = {
-                    if (ipAddress.isBlank()) { errorMsg = "请输入 IP 地址"; return@Button }
+                    if (ipAddress.isBlank()) { errorMsg = ipRequiredMsg; return@Button }
                     isConnecting = true
                     errorMsg = null
                     scope.launch {
@@ -116,7 +121,7 @@ fun ManualAddScreen(
                             }
                             onConnected(ipAddress, deviceName)
                         } else {
-                            errorMsg = "连接失败：${result.message}"
+                            errorMsg = String.format(connectFailedFmt, result.message)
                         }
                         isConnecting = false
                     }
@@ -127,7 +132,7 @@ fun ManualAddScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2673F9))
             ) {
                 Text(
-                    if (isConnecting) "连接中..." else "添加设备",
+                    if (isConnecting) stringResource(R.string.add_connecting) else stringResource(R.string.add_title),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
@@ -206,10 +211,10 @@ internal fun TipCard() {
             )
             Spacer(Modifier.width(10.dp))
             Column {
-                Text("温馨提醒", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                Text(stringResource(R.string.common_warm_tip), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "请确保手机与设备连接到同一局域网，以便搜索到设备并完成添加。",
+                    stringResource(R.string.add_lan_tip),
                     fontSize = 13.sp, color = AppColors.TextSecondary, lineHeight = 20.sp
                 )
             }

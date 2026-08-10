@@ -23,4 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "Live.Android"
 include ':app'
 include ':IRtekNetSDK'
-project(':IRtekNetSDK').projectDir = new File('F:/Volga.IRtekNetSDK/android')
+project(':IRtekNetSDK').projectDir = new File('F:/Volga.IRtekNetSDK/android/IRtekNetSDK')

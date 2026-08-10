@@ -37,6 +37,9 @@ interface AlarmDao {
     @Query("DELETE FROM alarm_messages WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM alarm_messages WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     @Query("DELETE FROM alarm_messages WHERE deviceId = :deviceId")
     suspend fun deleteByDevice(deviceId: Long)
 }

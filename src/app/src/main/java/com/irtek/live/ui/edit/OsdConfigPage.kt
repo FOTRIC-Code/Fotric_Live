@@ -63,6 +63,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -73,6 +74,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Image
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NativeSDK
 import com.irtek.netsdk.NetSDKManager
@@ -161,7 +163,7 @@ fun OsdConfigPage(onBack: () -> Unit) {
         scope.launch {
             val r = withContext(Dispatchers.IO) { NetSDKManager.setOverlay(channelId, json) }
             if (!r.isSuccess) {
-                Toast.makeText(context, "设置失败: ${r.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.common_set_failed_fmt, r.message), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -173,7 +175,7 @@ fun OsdConfigPage(onBack: () -> Unit) {
                 NetSDKManager.setChannel(channelId, JSONObject().put("name", name).toString())
             }
             if (!r.isSuccess) {
-                Toast.makeText(context, "通道名设置失败: ${r.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.edit_channel_name_fail, r.message), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -272,14 +274,14 @@ fun OsdConfigPage(onBack: () -> Unit) {
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("OSD 配置", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text(stringResource(R.string.edit_osd), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = { handleBack() }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary,
                             modifier = Modifier.size(22.dp)
                         )
@@ -331,7 +333,7 @@ fun OsdConfigPage(onBack: () -> Unit) {
                     )
                 } else {
                     Text(
-                        "等待视频画面…",
+                        stringResource(R.string.edit_waiting_video),
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 13.sp,
                         modifier = Modifier.align(Alignment.Center)
@@ -339,9 +341,9 @@ fun OsdConfigPage(onBack: () -> Unit) {
                 }
 
                 listOf(
-                    Triple(OsdKind.NAME, nameOv, channelName.ifBlank { "通道名称" }),
+                    Triple(OsdKind.NAME, nameOv, channelName.ifBlank { stringResource(R.string.edit_channel_name) }),
                     Triple(OsdKind.TIME, timeOv, timePreview),
-                    Triple(OsdKind.CUSTOM, customOv, customOv.text.ifBlank { "自定义信息" })
+                    Triple(OsdKind.CUSTOM, customOv, customOv.text.ifBlank { stringResource(R.string.edit_custom_info) })
                 ).forEach { (kind, block, label) ->
                     if (!block.enabled) return@forEach
                     val isSel = selected == kind
@@ -423,7 +425,7 @@ fun OsdConfigPage(onBack: () -> Unit) {
                     OsdKind.CUSTOM -> customOv
                 }
                 Text(
-                    "位置  X:${selectedBlock.x}  Y:${selectedBlock.y}  （热像 ${coordW}×${coordH}）",
+                    stringResource(R.string.edit_osd_pos, selectedBlock.x, selectedBlock.y, coordW, coordH),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = AppColors.TextSecondary,
@@ -436,7 +438,7 @@ fun OsdConfigPage(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OsdElementRow(
-                        title = "通道名",
+                        title = stringResource(R.string.edit_channel_name_short),
                         enabled = nameOv.enabled,
                         selected = selected == OsdKind.NAME,
                         editValue = channelName,
@@ -455,7 +457,7 @@ fun OsdConfigPage(onBack: () -> Unit) {
                     )
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), thickness = 0.5.dp, color = Color(0x0F1D2129))
                     OsdElementRow(
-                        title = "时间",
+                        title = stringResource(R.string.edit_time_label),
                         enabled = timeOv.enabled,
                         selected = selected == OsdKind.TIME,
                         editValue = null,
@@ -470,7 +472,7 @@ fun OsdConfigPage(onBack: () -> Unit) {
                     )
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), thickness = 0.5.dp, color = Color(0x0F1D2129))
                     OsdElementRow(
-                        title = "自定义文本",
+                        title = stringResource(R.string.edit_custom_text),
                         enabled = customOv.enabled,
                         selected = selected == OsdKind.CUSTOM,
                         editValue = customOv.text,

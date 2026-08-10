@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ShutterSpeed
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Thermostat
@@ -46,12 +45,16 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
+import com.irtek.live.R
 import com.irtek.live.data.entity.AlarmMessage
+import com.irtek.live.ui.message.MessageDetailScreen
+import com.irtek.live.ui.message.MessageItem
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NativeSDK
 import com.irtek.netsdk.NetSDKManager
@@ -83,7 +86,7 @@ fun PreviewScreen(
     onBack: () -> Unit,
     onCalibrate: () -> Unit = {},
     onEditDevice: () -> Unit = {},
-    onViewAllAlarms: () -> Unit = {}
+    onMarkAlarmRead: (Long) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -98,6 +101,7 @@ fun PreviewScreen(
     var showPaletteMenu by remember { mutableStateOf(false) }
     var paletteList by remember { mutableStateOf<JSONArray?>(null) }
     var currentPaletteRefNo by remember { mutableIntStateOf(-1) }
+    var detailAlarm by remember { mutableStateOf<AlarmMessage?>(null) }
 
     val sdf = remember { java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()) }
 
@@ -160,16 +164,17 @@ fun PreviewScreen(
         return
     }
 
-    Scaffold(
-        containerColor = AppColors.Background,
-        topBar = { PreviewTopBar(device.name, isRecording, onBack, onEditDevice) }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-        ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = AppColors.Background,
+            topBar = { PreviewTopBar(device.name, isRecording, onBack, onEditDevice) }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+            ) {
             VideoPreviewArea(
                 bitmap = currentBitmap,
                 aspectRatio = videoAspectRatio,
@@ -192,7 +197,7 @@ fun PreviewScreen(
                         }
                         Toast.makeText(
                             context,
-                            if (result.isSuccess) "已保存: ${file.name}" else "抓图失败",
+                            if (result.isSuccess) context.getString(R.string.preview_capture_ok, file.name) else context.getString(R.string.preview_capture_fail),
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -204,7 +209,7 @@ fun PreviewScreen(
                                 NetSDKManager.stopStreamRecord(activeStreamId)
                             }
                             isRecording = false
-                            Toast.makeText(context, "录像已保存", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.preview_record_saved), Toast.LENGTH_SHORT).show()
                         } else {
                             val ts = sdf.format(java.util.Date())
                             val file = File(recordDir, "VID_${ts}.mp4")
@@ -213,9 +218,9 @@ fun PreviewScreen(
                             }
                             if (result.isSuccess) {
                                 isRecording = true
-                                Toast.makeText(context, "开始录像", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.preview_record_started), Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "录像失败", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.preview_record_fail), Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -256,9 +261,29 @@ fun PreviewScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            RecentAlarmsCard(alarms, onViewAllAlarms)
+            RecentAlarmsCard(
+                alarms = alarms,
+                thumbnailPath = device.thumbnailPath,
+                onAlarmClick = { alarm ->
+                    onMarkAlarmRead(alarm.id)
+                    detailAlarm = alarm
+                }
+            )
 
             Spacer(Modifier.height(24.dp))
+        }
+        }
+
+        detailAlarm?.let { alarm ->
+            BackHandler { detailAlarm = null }
+            MessageDetailScreen(
+                item = MessageItem(
+                    alarm = alarm,
+                    deviceName = device.name,
+                    thumbnailPath = device.thumbnailPath
+                ),
+                onBack = { detailAlarm = null }
+            )
         }
     }
 }
@@ -341,7 +366,7 @@ private fun PreviewTopBar(
             IconButton(onClick = onBack) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
+                    contentDescription = stringResource(R.string.common_back),
                     tint = AppColors.TextPrimary,
                     modifier = Modifier.size(22.dp)
                 )
@@ -351,7 +376,7 @@ private fun PreviewTopBar(
             IconButton(onClick = onEditDevice) {
                 Icon(
                     Icons.Default.MoreVert,
-                    contentDescription = "设备配置",
+                    contentDescription = stringResource(R.string.preview_device_config),
                     tint = AppColors.TextPrimary,
                     modifier = Modifier.size(22.dp)
                 )
@@ -382,7 +407,7 @@ private fun VideoPreviewArea(
         if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
-                contentDescription = "热成像视频",
+                contentDescription = stringResource(R.string.preview_thermal_video),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -410,7 +435,7 @@ private fun VideoPreviewArea(
             ) {
                 Icon(
                     Icons.Default.Fullscreen,
-                    contentDescription = "全屏",
+                    contentDescription = stringResource(R.string.preview_fullscreen),
                     tint = Color.White,
                     modifier = Modifier.size(22.dp)
                 )
@@ -452,7 +477,7 @@ private fun FullscreenVideoView(
         if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
-                contentDescription = "热成像视频",
+                contentDescription = stringResource(R.string.preview_thermal_video),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
@@ -485,7 +510,7 @@ private fun FullscreenVideoView(
                     IconButton(onClick = onExit) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "退出全屏",
+                            contentDescription = stringResource(R.string.preview_exit_fullscreen),
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
@@ -523,15 +548,15 @@ private fun ActionButtonsCard(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            ActionButton(Icons.Outlined.CameraAlt, "抓图", onCapture)
+            ActionButton(Icons.Outlined.CameraAlt, stringResource(R.string.preview_capture), onCapture)
             ActionButton(
                 Icons.Outlined.Videocam,
-                if (isRecording) "停止" else "录像",
+                if (isRecording) stringResource(R.string.preview_stop) else stringResource(R.string.preview_record),
                 onRecord,
                 tint = if (isRecording) Color.Red else AppColors.TextPrimary
             )
             Box {
-                ActionButton(Icons.Outlined.Palette, "调色板", onPaletteClick)
+                ActionButton(Icons.Outlined.Palette, stringResource(R.string.preview_palette), onPaletteClick)
                 PaletteDropdown(
                     expanded = showPaletteMenu,
                     palettes = paletteList,
@@ -540,7 +565,7 @@ private fun ActionButtonsCard(
                     onSelect = onPaletteSelect
                 )
             }
-            ActionButton(Icons.Outlined.ShutterSpeed, "校准", onCalibrate)
+            ActionButton(Icons.Outlined.ShutterSpeed, stringResource(R.string.preview_calibrate), onCalibrate)
         }
     }
 }
@@ -562,7 +587,7 @@ private fun PaletteDropdown(
     ) {
         if (palettes == null || palettes.length() == 0) {
             DropdownMenuItem(
-                text = { Text("无可用调色板", fontSize = 13.sp, color = AppColors.TextSecondary) },
+                text = { Text(stringResource(R.string.preview_no_palette), fontSize = 13.sp, color = AppColors.TextSecondary) },
                 onClick = onDismiss
             )
         } else {
@@ -631,7 +656,8 @@ private fun ActionButton(
 @Composable
 private fun RecentAlarmsCard(
     alarms: List<AlarmMessage>,
-    onViewAll: () -> Unit
+    thumbnailPath: String,
+    onAlarmClick: (AlarmMessage) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -644,37 +670,12 @@ private fun RecentAlarmsCard(
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "最近告警",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppColors.TextPrimary
-                )
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable(onClick = onViewAll),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "全部(${alarms.size})",
-                        fontSize = 12.sp,
-                        color = Color(0xFF0256FF),
-                        fontWeight = FontWeight.Normal
-                    )
-                    Icon(
-                        Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = Color(0xFF0256FF),
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
+            Text(
+                stringResource(R.string.preview_recent_alarms),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.TextPrimary
+            )
 
             Spacer(Modifier.height(10.dp))
 
@@ -686,7 +687,7 @@ private fun RecentAlarmsCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "暂无告警",
+                        stringResource(R.string.preview_no_alarms),
                         fontSize = 13.sp,
                         color = AppColors.TextSecondary
                     )
@@ -696,7 +697,11 @@ private fun RecentAlarmsCard(
                     if (index > 0) {
                         Spacer(Modifier.height(8.dp))
                     }
-                    AlarmItem(alarm)
+                    AlarmItem(
+                        alarm = alarm,
+                        thumbnailPath = thumbnailPath,
+                        onClick = { onAlarmClick(alarm) }
+                    )
                 }
             }
         }
@@ -704,13 +709,31 @@ private fun RecentAlarmsCard(
 }
 
 @Composable
-private fun AlarmItem(alarm: AlarmMessage) {
+private fun AlarmItem(
+    alarm: AlarmMessage,
+    thumbnailPath: String,
+    onClick: () -> Unit
+) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+    var bitmap by remember(thumbnailPath) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(thumbnailPath) {
+        bitmap = if (thumbnailPath.isNotBlank()) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+                    android.graphics.BitmapFactory.decodeFile(thumbnailPath, opts)?.asImageBitmap()
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        } else null
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
             .background(Color.White)
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -722,19 +745,28 @@ private fun AlarmItem(alarm: AlarmMessage) {
                 .background(Color(0xFF2A2D5E)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Outlined.Thermostat,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.4f),
-                modifier = Modifier.size(28.dp)
-            )
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap!!,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    Icons.Outlined.Thermostat,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
 
         Spacer(Modifier.width(10.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                alarm.title.ifBlank { "高温告警" },
+                alarm.title.ifBlank { alarm.type.ifBlank { stringResource(R.string.msg_type_temp) } },
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.TextPrimary,
@@ -770,7 +802,7 @@ private fun AlarmItem(alarm: AlarmMessage) {
                 )
                 Spacer(Modifier.width(3.dp))
                 Text(
-                    "${alarm.temperature}℃",
+                    "%.1f℃".format(Locale.US, alarm.temperature),
                     fontSize = 12.sp,
                     color = AppColors.TextSecondary
                 )

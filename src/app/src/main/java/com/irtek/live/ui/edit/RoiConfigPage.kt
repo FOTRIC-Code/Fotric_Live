@@ -74,12 +74,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NativeSDK
 import com.irtek.netsdk.NetSDKManager
@@ -152,7 +154,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
         scope.launch {
             val r = withContext(Dispatchers.IO) { NetSDKManager.setThermalMarkers(json) }
             if (!r.isSuccess) {
-                Toast.makeText(context, "保存失败: ${r.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.common_save_failed_fmt, r.message), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -344,14 +346,14 @@ fun RoiConfigPage(onBack: () -> Unit) {
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("ROI 配置", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text(stringResource(R.string.edit_roi), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = { handleBack() }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary,
                             modifier = Modifier.size(22.dp)
                         )
@@ -395,7 +397,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
                     )
                 } else {
                     Text(
-                        "等待视频画面…",
+                        stringResource(R.string.edit_waiting_video),
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 13.sp,
                         modifier = Modifier.align(Alignment.Center)
@@ -557,7 +559,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
 
             // Tools outside video — match edit card style
             Text(
-                "绘制工具",
+                stringResource(R.string.edit_draw_tools),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.TextSecondary,
@@ -576,17 +578,17 @@ fun RoiConfigPage(onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    MarkerToolButton(0, Icons.Outlined.NearMe, "选择", markerMode, Color(0xFF2673F9)) { markerMode = 0 }
-                    MarkerToolButton(1, Icons.Outlined.FiberManualRecord, "点", markerMode, Color(0xFF2673F9)) { markerMode = 1 }
-                    MarkerToolButton(2, Icons.Outlined.Remove, "线", markerMode, Color(0xFF2673F9)) { markerMode = 2 }
-                    MarkerToolButton(3, Icons.Outlined.CropSquare, "框", markerMode, Color(0xFF2673F9)) { markerMode = 3 }
+                    MarkerToolButton(0, Icons.Outlined.NearMe, stringResource(R.string.common_select), markerMode, Color(0xFF2673F9)) { markerMode = 0 }
+                    MarkerToolButton(1, Icons.Outlined.FiberManualRecord, stringResource(R.string.marker_type_point), markerMode, Color(0xFF2673F9)) { markerMode = 1 }
+                    MarkerToolButton(2, Icons.Outlined.Remove, stringResource(R.string.marker_type_line), markerMode, Color(0xFF2673F9)) { markerMode = 2 }
+                    MarkerToolButton(3, Icons.Outlined.CropSquare, stringResource(R.string.edit_roi_tool_box), markerMode, Color(0xFF2673F9)) { markerMode = 3 }
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "ROI 列表",
+                stringResource(R.string.edit_roi_list),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.TextSecondary,
@@ -605,11 +607,18 @@ fun RoiConfigPage(onBack: () -> Unit) {
                             .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("暂无测温标识", fontSize = 14.sp, color = AppColors.TextSecondary)
+                        Text(stringResource(R.string.alarm_no_markers), fontSize = 14.sp, color = AppColors.TextSecondary)
                     }
                 } else {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         markers.forEachIndexed { index, m ->
+                            val typeLabel = markerTypeLabel(m.type)
+                            val typePrefix = stringResource(R.string.edit_type_prefix, typeLabel)
+                            val globalParamsText = stringResource(R.string.edit_global_params)
+                            val reflText = if (m.localParams != 0) {
+                                stringResource(R.string.edit_refl_prefix, m.reflTemp, tempUnit)
+                            } else ""
+                            val markerName = m.name.ifBlank { stringResource(R.string.alarm_marker_fmt, m.id) }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -619,7 +628,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        m.name.ifBlank { "标识${m.id}" },
+                                        markerName,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = AppColors.TextPrimary
@@ -627,13 +636,13 @@ fun RoiConfigPage(onBack: () -> Unit) {
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         buildString {
-                                            append("类型: ${markerTypeLabel(m.type)}")
+                                            append(typePrefix)
                                             if (m.localParams != 0) {
                                                 append("  |  ε=${String.format("%.2f", m.emissivity)}")
                                                 append("  d=${String.format("%.1f", m.distance)}$distUnit")
-                                                append("  反射=${String.format("%.1f", m.reflTemp)}$tempUnit")
+                                                append("  $reflText")
                                             } else {
-                                                append("  |  全局参数")
+                                                append(globalParamsText)
                                             }
                                         },
                                         fontSize = 12.sp,
@@ -650,7 +659,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
                                 ) {
                                     Icon(
                                         Icons.Outlined.Delete,
-                                        contentDescription = "删除",
+                                        contentDescription = stringResource(R.string.common_delete),
                                         tint = AppColors.TextSecondary,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -725,14 +734,14 @@ private fun MarkerParamsEditPage(
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("ROI 参数", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text(stringResource(R.string.edit_roi_params), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary,
                             modifier = Modifier.size(22.dp)
                         )
@@ -753,14 +762,14 @@ private fun MarkerParamsEditPage(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                "基本信息",
+                stringResource(R.string.edit_basic_info),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.TextSecondary,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
             )
             RoiCard {
-                RoiEditRow("名称", name, KeyboardType.Text) { name = it }
+                RoiEditRow(stringResource(R.string.common_name), name, KeyboardType.Text) { name = it }
                 RoiDivider()
                 Row(
                     modifier = Modifier
@@ -768,7 +777,7 @@ private fun MarkerParamsEditPage(
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("类型", fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.common_type), fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
                     Text(markerTypeLabel(marker.type), fontSize = 14.sp, color = AppColors.TextSecondary)
                 }
             }
@@ -776,7 +785,7 @@ private fun MarkerParamsEditPage(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "测温参数",
+                stringResource(R.string.edit_measure_params),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.TextSecondary,
@@ -790,7 +799,7 @@ private fun MarkerParamsEditPage(
                         .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("启用独立参数", fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.edit_local_params), fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
                     Switch(
                         checked = useLocal,
                         onCheckedChange = { useLocal = it },
@@ -799,11 +808,11 @@ private fun MarkerParamsEditPage(
                 }
                 if (useLocal) {
                     RoiDivider()
-                    RoiEditRow("发射率", emissivity, KeyboardType.Decimal) { emissivity = it }
+                    RoiEditRow(stringResource(R.string.edit_emissivity), emissivity, KeyboardType.Decimal) { emissivity = it }
                     RoiDivider()
-                    RoiEditRow("距离", distance, KeyboardType.Decimal, distUnit) { distance = it }
+                    RoiEditRow(stringResource(R.string.edit_distance), distance, KeyboardType.Decimal, distUnit) { distance = it }
                     RoiDivider()
-                    RoiEditRow("反射温度", reflTemp, KeyboardType.Decimal, tempUnit) { reflTemp = it }
+                    RoiEditRow(stringResource(R.string.edit_refl_temp), reflTemp, KeyboardType.Decimal, tempUnit) { reflTemp = it }
                 }
             }
 
@@ -826,7 +835,7 @@ private fun MarkerParamsEditPage(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2673F9))
             ) {
-                Text("保存", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.common_save), fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
 
             Spacer(Modifier.height(24.dp))
@@ -935,13 +944,14 @@ private fun MarkerToolButton(
     }
 }
 
+@Composable
 private fun markerTypeLabel(type: Int): String = when (type) {
-    1 -> "点"
-    2, 6 -> "线"
-    3 -> "矩形"
-    4 -> "椭圆"
-    5 -> "多边形"
-    else -> "未知"
+    1 -> stringResource(R.string.marker_type_point)
+    2, 6 -> stringResource(R.string.marker_type_line)
+    3 -> stringResource(R.string.marker_type_rect)
+    4 -> stringResource(R.string.marker_type_ellipse)
+    5 -> stringResource(R.string.marker_type_polygon)
+    else -> stringResource(R.string.common_unknown)
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHandle(

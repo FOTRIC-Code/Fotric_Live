@@ -18,9 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.Dispatchers
@@ -61,21 +63,21 @@ fun DeviceMaintenanceScreen(
     if (showRestartDialog) {
         AlertDialog(
             onDismissRequest = { showRestartDialog = false },
-            title = { Text("重启设备") },
-            text = { Text("确定要重启设备吗？重启后设备将暂时无法访问。") },
+            title = { Text(stringResource(R.string.maint_restart)) },
+            text = { Text(stringResource(R.string.maint_restart_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     showRestartDialog = false
                     scope.launch {
                         val r = NetSDKManager.deviceRestart()
                         Toast.makeText(context,
-                            if (r.isSuccess) "设备正在重启" else "操作失败",
+                            if (r.isSuccess) context.getString(R.string.maint_restarting) else context.getString(R.string.common_operation_failed),
                             Toast.LENGTH_SHORT).show()
                     }
-                }) { Text("确定", color = Color(0xFFDC2626)) }
+                }) { Text(stringResource(R.string.common_ok), color = Color(0xFFDC2626)) }
             },
             dismissButton = {
-                TextButton(onClick = { showRestartDialog = false }) { Text("取消") }
+                TextButton(onClick = { showRestartDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -83,21 +85,21 @@ fun DeviceMaintenanceScreen(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title = { Text("恢复出厂设置") },
-            text = { Text("恢复出厂设置将清除所有配置，确定继续吗？") },
+            title = { Text(stringResource(R.string.maint_reset)) },
+            text = { Text(stringResource(R.string.maint_reset_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     showResetDialog = false
                     scope.launch {
                         val r = NetSDKManager.deviceReset()
                         Toast.makeText(context,
-                            if (r.isSuccess) "设备正在恢复出厂设置" else "操作失败",
+                            if (r.isSuccess) context.getString(R.string.maint_resetting) else context.getString(R.string.common_operation_failed),
                             Toast.LENGTH_SHORT).show()
                     }
-                }) { Text("确定", color = Color(0xFFDC2626)) }
+                }) { Text(stringResource(R.string.common_ok), color = Color(0xFFDC2626)) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("取消") }
+                TextButton(onClick = { showResetDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -108,13 +110,13 @@ fun DeviceMaintenanceScreen(
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("设备维护", fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                        Text(stringResource(R.string.maint_title), fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回",
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
                     }
                 },
@@ -140,31 +142,31 @@ fun DeviceMaintenanceScreen(
             ) {
                 Column {
                     MaintenanceRow(
-                        title = "重启设备",
-                        subtitle = "重新启动设备便设置生效或恢复运行"
+                        title = stringResource(R.string.maint_restart),
+                        subtitle = stringResource(R.string.maint_restart_desc)
                     ) { showRestartDialog = true }
 
                     SettingDivider()
 
                     MaintenanceRow(
-                        title = "固件升级",
-                        subtitle = "检测并升级固件以获取新功能"
+                        title = stringResource(R.string.maint_upgrade),
+                        subtitle = stringResource(R.string.maint_upgrade_desc)
                     ) {
-                        Toast.makeText(context, "暂不支持", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.common_not_supported), Toast.LENGTH_SHORT).show()
                     }
 
                     SettingDivider()
 
                     MaintenanceRow(
-                        title = "恢复出厂设置",
-                        subtitle = "将设备恢复到出厂默认设置"
+                        title = stringResource(R.string.maint_reset),
+                        subtitle = stringResource(R.string.maint_reset_desc)
                     ) { showResetDialog = true }
 
                     SettingDivider()
 
                     MaintenanceRow(
-                        title = "设备信息",
-                        subtitle = "查看设备详细信息与运行状态"
+                        title = stringResource(R.string.maint_device_info),
+                        subtitle = stringResource(R.string.maint_info_desc)
                     ) { subPage = "device_info" }
                 }
             }
@@ -189,11 +191,11 @@ fun DeviceMaintenanceScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("温馨提醒", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        Text(stringResource(R.string.common_warm_tip), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextPrimary)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "部分维护操作可能会导致设备重启或中断服务。请在合适时间进行操作。",
+                            stringResource(R.string.maint_tip_body),
                             fontSize = 13.sp, color = AppColors.TextSecondary,
                             lineHeight = 18.sp
                         )
@@ -247,13 +249,13 @@ private fun DeviceInfoSubPage(info: JSONObject?, onBack: () -> Unit) {
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("设备信息", fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                        Text(stringResource(R.string.maint_device_info), fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回",
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
                     }
                 },
@@ -278,17 +280,17 @@ private fun DeviceInfoSubPage(info: JSONObject?, onBack: () -> Unit) {
             ) {
                 Column {
                     if (info != null) {
-                        InfoRow("名称", info.optString("name"))
+                        InfoRow(stringResource(R.string.common_name), info.optString("name"))
                         SettingDivider()
-                        InfoRow("型号", info.optString("model"))
+                        InfoRow(stringResource(R.string.common_model), info.optString("model"))
                         SettingDivider()
-                        InfoRow("序列号", info.optString("serial_no"))
+                        InfoRow(stringResource(R.string.common_serial), info.optString("serial_no"))
                         SettingDivider()
-                        InfoRow("品牌", info.optString("brand"))
+                        InfoRow(stringResource(R.string.common_brand), info.optString("brand"))
                         SettingDivider()
-                        InfoRow("厂商", info.optString("company"))
+                        InfoRow(stringResource(R.string.common_company), info.optString("company"))
                         SettingDivider()
-                        InfoRow("固件版本", info.optString("firmware_version"))
+                        InfoRow(stringResource(R.string.common_firmware_version), info.optString("firmware_version"))
                         SettingDivider()
                         val sdkVer = remember {
                             val r = NetSDKManager.getSdkVersion()
@@ -297,10 +299,10 @@ private fun DeviceInfoSubPage(info: JSONObject?, onBack: () -> Unit) {
                                 "${d.optInt("major")}.${d.optInt("minor")}.${d.optInt("patch")}.${d.optInt("build")}"
                             } else "-"
                         }
-                        InfoRow("SDK 版本", sdkVer)
+                        InfoRow(stringResource(R.string.maint_sdk_version), sdkVer)
                     } else {
                         Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text("暂无设备信息", fontSize = 14.sp, color = AppColors.TextSecondary)
+                            Text(stringResource(R.string.maint_no_info), fontSize = 14.sp, color = AppColors.TextSecondary)
                         }
                     }
                 }

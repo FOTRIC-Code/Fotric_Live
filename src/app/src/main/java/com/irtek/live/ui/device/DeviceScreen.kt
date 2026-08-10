@@ -9,7 +9,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.irtek.live.R
 import com.irtek.live.ui.components.SectionCard
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.Dispatchers
@@ -20,9 +23,11 @@ import kotlinx.coroutines.withContext
 @Composable
 fun DeviceScreen(deviceIp: String, onDisconnect: () -> Unit) {
     val scope = rememberCoroutineScope()
-    var deviceInfoText by remember { mutableStateOf("加载中...") }
-    var lensInfoText by remember { mutableStateOf("加载中...") }
-    var streamsText by remember { mutableStateOf("加载中...") }
+    val context = LocalContext.current
+    val loadingText = stringResource(R.string.common_loading)
+    var deviceInfoText by remember { mutableStateOf(loadingText) }
+    var lensInfoText by remember { mutableStateOf(loadingText) }
+    var streamsText by remember { mutableStateOf(loadingText) }
 
     fun refreshAll() {
         scope.launch {
@@ -31,38 +36,38 @@ fun DeviceScreen(deviceIp: String, onDisconnect: () -> Unit) {
                 deviceInfoText = if (r.isSuccess && r.data != null) {
                     val d = r.data!!
                     buildString {
-                        append("名称: ${d.optString("name")}")
-                        append("\n型号: ${d.optString("model")}")
-                        append("\n规格: ${d.optString("spec")}")
-                        append("\n序列号: ${d.optString("serial_no")}")
-                        append("\n设备ID: ${d.optString("id")}")
-                        append("\n品牌: ${d.optString("brand")}")
-                        append("\n公司: ${d.optString("company")}")
-                        append("\n固件: ${d.optString("firmware_name")} ${d.optString("firmware_version")}")
+                        append("${context.getString(R.string.common_name)}: ${d.optString("name")}")
+                        append("\n${context.getString(R.string.common_model)}: ${d.optString("model")}")
+                        append("\n${context.getString(R.string.detail_spec)}: ${d.optString("spec")}")
+                        append("\n${context.getString(R.string.common_serial)}: ${d.optString("serial_no")}")
+                        append("\n${context.getString(R.string.detail_device_id)}: ${d.optString("id")}")
+                        append("\n${context.getString(R.string.common_brand)}: ${d.optString("brand")}")
+                        append("\n${context.getString(R.string.common_company)}: ${d.optString("company")}")
+                        append("\n${context.getString(R.string.common_firmware)}: ${d.optString("firmware_name")} ${d.optString("firmware_version")}")
                     }
-                } else "获取失败: ${r.message}"
+                } else context.getString(R.string.detail_fetch_failed, r.message)
 
                 val lr = NetSDKManager.getThermalLensInfo()
                 lensInfoText = if (lr.isSuccess && lr.data != null) {
                     val d = lr.data!!
                     buildString {
-                        append("名称: ${d.optString("name")}")
-                        append("\n焦距: ${d.optDouble("focal", 0.0)}mm")
-                        append("\n水平视场角: ${d.optDouble("hfov", 0.0)}°")
-                        append("\n垂直视场角: ${d.optDouble("vfov", 0.0)}°")
-                        append("\n波段: ${d.optString("band")}")
+                        append("${context.getString(R.string.common_name)}: ${d.optString("name")}")
+                        append("\n${context.getString(R.string.detail_focal)}: ${d.optDouble("focal", 0.0)}mm")
+                        append("\n${context.getString(R.string.detail_hfov)}: ${d.optDouble("hfov", 0.0)}°")
+                        append("\n${context.getString(R.string.detail_vfov)}: ${d.optDouble("vfov", 0.0)}°")
+                        append("\n${context.getString(R.string.detail_band)}: ${d.optString("band")}")
                     }
-                } else "获取失败: ${lr.message}"
+                } else context.getString(R.string.detail_fetch_failed, lr.message)
 
                 val sr = NetSDKManager.getStreams()
                 streamsText = if (sr.isSuccess && sr.data != null) {
                     val arr = sr.data!!
-                    if (arr.length() == 0) "无视频流"
+                    if (arr.length() == 0) context.getString(R.string.detail_no_stream)
                     else (0 until arr.length()).joinToString("\n") { i ->
                         val s = arr.getJSONObject(i)
-                        "流${s.optInt("id")}: ${s.optInt("resolution_width")}x${s.optInt("resolution_height")} ${s.optString("codec_type")} ${s.optInt("bit_rate") / 1024}kbps ${s.optInt("max_frame_rate")}fps"
+                        "${context.getString(R.string.common_video)} ${s.optInt("id")}: ${s.optInt("resolution_width")}x${s.optInt("resolution_height")} ${s.optString("codec_type")} ${s.optInt("bit_rate") / 1024}kbps ${s.optInt("max_frame_rate")}fps"
                     }
-                } else "获取失败: ${sr.message}"
+                } else context.getString(R.string.detail_fetch_failed, sr.message)
             }
         }
     }
@@ -75,15 +80,15 @@ fun DeviceScreen(deviceIp: String, onDisconnect: () -> Unit) {
                 title = { Text(deviceIp, style = MaterialTheme.typography.titleSmall) },
                 navigationIcon = {
                     IconButton(onClick = onDisconnect) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "断开")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_disconnect))
                     }
                 },
                 actions = {
                     IconButton(onClick = { refreshAll() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.common_refresh))
                     }
                     TextButton(onClick = onDisconnect) {
-                        Text("断开", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.common_disconnect), color = MaterialTheme.colorScheme.error)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -98,17 +103,17 @@ fun DeviceScreen(deviceIp: String, onDisconnect: () -> Unit) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            SectionCard("设备信息") {
+            SectionCard(stringResource(R.string.detail_device_info)) {
                 Text(deviceInfoText, style = MaterialTheme.typography.bodySmall)
             }
-            SectionCard("镜头信息") {
+            SectionCard(stringResource(R.string.detail_lens_info)) {
                 Text(lensInfoText, style = MaterialTheme.typography.bodySmall)
             }
-            SectionCard("视频流") {
+            SectionCard(stringResource(R.string.detail_streams)) {
                 Text(streamsText, style = MaterialTheme.typography.bodySmall)
             }
-            SectionCard("连接状态") {
-                Text("设备IP: $deviceIp", style = MaterialTheme.typography.bodySmall)
+            SectionCard(stringResource(R.string.detail_connection)) {
+                Text(stringResource(R.string.detail_device_ip, deviceIp), style = MaterialTheme.typography.bodySmall)
             }
         }
     }

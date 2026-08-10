@@ -1,5 +1,6 @@
 package com.irtek.live
 
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,8 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
+import com.irtek.live.alarm.AlarmMonitor
 import com.irtek.live.data.AppDatabase
 import com.irtek.live.data.entity.DeviceEntity
+import com.irtek.live.settings.LocaleHelper
 import com.irtek.live.ui.adddevice.AddDeviceScreen
 import com.irtek.live.ui.adddevice.ManualAddScreen
 import com.irtek.live.ui.adddevice.OnlineAddScreen
@@ -23,12 +27,20 @@ import com.irtek.live.ui.preview.PreviewScreen
 import com.irtek.live.ui.theme.LiveTheme
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
 class MainActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_Live)
         super.onCreate(savedInstanceState)
@@ -38,7 +50,10 @@ class MainActivity : ComponentActivity() {
             LiveTheme {
                 val scope = rememberCoroutineScope()
                 var screen by remember { mutableStateOf<Screen>(Screen.Splash) }
-                var selectedNav by remember { mutableIntStateOf(0) }
+                var didWarmLogin by remember { mutableStateOf(false) }
+                var selectedNav by remember {
+                    mutableIntStateOf(if (intent?.getBooleanExtra("open_messages", false) == true) 1 else 0)
+                }
                 val captureDir = remember { File(filesDir, "captures") }
                 val recordDir = remember { File(filesDir, "records") }
 
@@ -66,51 +81,15 @@ class MainActivity : ComponentActivity() {
                 var isRefreshing by remember { mutableStateOf(false) }
 
                 val allAlarms by db.alarmDao().getAll().collectAsState(initial = emptyList())
-                val messageItems = remember(allAlarms, deviceEntities) {
+                val unknownDeviceName = stringResource(R.string.common_unknown_device)
+                val messageItems = remember(allAlarms, deviceEntities, unknownDeviceName) {
                     allAlarms.map { alarm ->
                         val device = deviceEntities.find { it.id == alarm.deviceId }
                         MessageItem(
                             alarm = alarm,
-                            deviceName = device?.name ?: "未知设备",
+                            deviceName = device?.name ?: unknownDeviceName,
                             thumbnailPath = device?.thumbnailPath ?: ""
                         )
-                    }
-                }
-
-                LaunchedEffect(Unit) {
-                    withContext(Dispatchers.IO) {
-                        if (db.alarmDao().count() == 0L) {
-                            val devices = db.deviceDao().getAllOnce()
-                            if (devices.isNotEmpty()) {
-                                val now = System.currentTimeMillis()
-                                val mockAlarms = listOf(
-                                    com.irtek.live.data.entity.AlarmMessage(
-                                        deviceId = devices[0].id, type = "温度报警",
-                                        title = "温度超限", content = "检测到温度异常",
-                                        temperature = 85.2, threshold = 80.0,
-                                        timestamp = now - 3600_000
-                                    ),
-                                    com.irtek.live.data.entity.AlarmMessage(
-                                        deviceId = devices[0].id, type = "入侵报警",
-                                        title = "移动侦测", content = "检测到移动物体",
-                                        timestamp = now - 7200_000
-                                    ),
-                                    com.irtek.live.data.entity.AlarmMessage(
-                                        deviceId = devices.last().id, type = "温度报警",
-                                        title = "温度超限", content = "检测到温度异常",
-                                        temperature = 92.1, threshold = 80.0,
-                                        timestamp = now - 1800_000
-                                    ),
-                                    com.irtek.live.data.entity.AlarmMessage(
-                                        deviceId = devices.last().id, type = "温度报警",
-                                        title = "温度超限", content = "高温预警",
-                                        temperature = 78.5, threshold = 75.0,
-                                        timestamp = now - 600_000
-                                    )
-                                )
-                                mockAlarms.forEach { db.alarmDao().insert(it) }
-                            }
-                        }
                     }
                 }
 
@@ -121,6 +100,16 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     is Screen.DeviceList -> {
+                        // Keep all devices logged in for the app lifetime.
+                        LaunchedEffect(Unit) {
+                            if (!didWarmLogin) {
+                                didWarmLogin = true
+                                isRefreshing = true
+                                val thumbDir = File(filesDir, "thumbnails")
+                                refreshAllDevices(db, thumbDir)
+                                isRefreshing = false
+                            }
+                        }
                         DeviceListScreen(
                             devices = devices,
                             isRefreshing = isRefreshing,
@@ -135,18 +124,20 @@ class MainActivity : ComponentActivity() {
                             },
                             onAddDevice = { screen = Screen.AddDevice },
                             onDeviceClick = { device ->
-                                val entity = deviceEntities.find { it.id.toString() == device.id }
-                                if (entity != null) {
-                                    screen = Screen.Preview(
-                                        entity.id, entity.name, entity.ip, entity.thumbnailPath
-                                    )
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            NetSDKManager.login(
-                                                entity.ip, entity.port,
-                                                entity.userName,
-                                                entity.password.ifBlank { "admin" }
-                                            )
+                                if (device.status != DeviceStatus.OFFLINE) {
+                                    val entity = deviceEntities.find { it.id.toString() == device.id }
+                                    if (entity != null) {
+                                        screen = Screen.Preview(
+                                            entity.id, entity.name, entity.ip, entity.thumbnailPath
+                                        )
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                NetSDKManager.ensureLogin(
+                                                    entity.ip, entity.port,
+                                                    entity.userName,
+                                                    entity.password.ifBlank { "admin" }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -154,6 +145,11 @@ class MainActivity : ComponentActivity() {
                             onDeleteDevice = { device ->
                                 scope.launch {
                                     withContext(Dispatchers.IO) {
+                                        val entity = deviceEntities.find { it.id.toString() == device.id }
+                                        if (entity != null) {
+                                            AlarmMonitor.stopListening(entity.ip)
+                                            NetSDKManager.logoutByIp(entity.ip, entity.port)
+                                        }
                                         db.deviceDao().deleteById(device.id.toLong())
                                     }
                                 }
@@ -164,7 +160,7 @@ class MainActivity : ComponentActivity() {
                                     screen = Screen.AlarmConfig(entity.id, entity.name, entity.ip)
                                     scope.launch {
                                         withContext(Dispatchers.IO) {
-                                            NetSDKManager.login(
+                                            NetSDKManager.ensureLogin(
                                                 entity.ip, entity.port,
                                                 entity.userName,
                                                 entity.password.ifBlank { "admin" }
@@ -179,7 +175,7 @@ class MainActivity : ComponentActivity() {
                                     screen = Screen.Maintenance(entity.id, entity.name, entity.ip)
                                     scope.launch {
                                         withContext(Dispatchers.IO) {
-                                            NetSDKManager.login(
+                                            NetSDKManager.ensureLogin(
                                                 entity.ip, entity.port,
                                                 entity.userName,
                                                 entity.password.ifBlank { "admin" }
@@ -194,7 +190,7 @@ class MainActivity : ComponentActivity() {
                                     screen = Screen.EditDevice(entity.id, entity.name, entity.ip)
                                     scope.launch {
                                         withContext(Dispatchers.IO) {
-                                            NetSDKManager.login(
+                                            NetSDKManager.ensureLogin(
                                                 entity.ip, entity.port,
                                                 entity.userName,
                                                 entity.password.ifBlank { "admin" }
@@ -205,7 +201,25 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavSelect = { selectedNav = it },
                             messageContent = {
-                                MessageScreen(messages = messageItems)
+                                MessageScreen(
+                                    messages = messageItems,
+                                    onDelete = { ids ->
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                if (ids.isNotEmpty()) {
+                                                    db.alarmDao().deleteByIds(ids)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onMarkRead = { id ->
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                db.alarmDao().markRead(id)
+                                            }
+                                        }
+                                    }
+                                )
                             },
                             galleryContent = {
                                 GalleryScreen(
@@ -213,7 +227,11 @@ class MainActivity : ComponentActivity() {
                                     recordDir = recordDir
                                 )
                             },
-                            mineContent = { MineScreen() }
+                            mineContent = {
+                                MineScreen(
+                                    onLanguageChanged = { recreate() }
+                                )
+                            }
                         )
                     }
                     is Screen.AddDevice -> {
@@ -231,8 +249,8 @@ class MainActivity : ComponentActivity() {
                             onConnected = { ip, userDeviceName ->
                                 scope.launch {
                                     val thumbDir = File(filesDir, "thumbnails")
+                                    // Keep session logged in for the rest of the app lifetime.
                                     saveDeviceAfterLogin(db, ip, thumbDir, userDeviceName)
-                                    NetSDKManager.logout()
                                 }
                                 screen = Screen.DeviceList
                             }
@@ -265,8 +283,8 @@ class MainActivity : ComponentActivity() {
                         val leavePreview = {
                             scope.launch {
                                 withContext(Dispatchers.IO) {
+                                    // Stop preview stream only; keep device login until app exit.
                                     NetSDKManager.stopStream()
-                                    NetSDKManager.logout()
                                 }
                             }
                             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -306,59 +324,44 @@ class MainActivity : ComponentActivity() {
                                     fromPreview = true,
                                     thumbnailPath = s.thumbnailPath
                                 )
+                            },
+                            onMarkAlarmRead = { id ->
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        db.alarmDao().markRead(id)
+                                    }
+                                }
                             }
                         )
                     }
                     is Screen.DeviceDetail -> {
-                        BackHandler {
-                            scope.launch { NetSDKManager.logout() }
-                            screen = Screen.DeviceList
-                        }
+                        BackHandler { screen = Screen.DeviceList }
                         DeviceScreen(
                             deviceIp = s.ip,
-                            onDisconnect = {
-                                scope.launch {
-                                    NetSDKManager.logout()
-                                }
-                                screen = Screen.DeviceList
-                            }
+                            onDisconnect = { screen = Screen.DeviceList }
                         )
                     }
                     is Screen.AlarmConfig -> {
-                        BackHandler {
-                            scope.launch { NetSDKManager.logout() }
-                            screen = Screen.DeviceList
-                        }
+                        BackHandler { screen = Screen.DeviceList }
                         com.irtek.live.ui.alarm.AlarmConfigScreen(
                             deviceIp = s.ip,
                             deviceName = s.name,
-                            onBack = {
-                                scope.launch { NetSDKManager.logout() }
-                                screen = Screen.DeviceList
-                            }
+                            onBack = { screen = Screen.DeviceList }
                         )
                     }
                     is Screen.Maintenance -> {
-                        BackHandler {
-                            scope.launch { NetSDKManager.logout() }
-                            screen = Screen.DeviceList
-                        }
+                        BackHandler { screen = Screen.DeviceList }
                         com.irtek.live.ui.maintenance.DeviceMaintenanceScreen(
                             deviceIp = s.ip,
                             deviceName = s.name,
-                            onBack = {
-                                scope.launch { NetSDKManager.logout() }
-                                screen = Screen.DeviceList
-                            }
+                            onBack = { screen = Screen.DeviceList }
                         )
                     }
                     is Screen.EditDevice -> {
                         val leaveEdit = {
                             if (s.fromPreview) {
-                                // 保持登录，返回预览并重新拉流
                                 screen = Screen.Preview(s.deviceId, s.name, s.ip, s.thumbnailPath)
                             } else {
-                                scope.launch { NetSDKManager.logout() }
                                 screen = Screen.DeviceList
                             }
                         }
@@ -372,6 +375,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        // Application.onTerminate is unreliable on real devices; release all logins here.
+        if (isFinishing && !isChangingConfigurations) {
+            kotlinx.coroutines.runBlocking {
+                AlarmMonitor.stopAll()
+            }
+            NetSDKManager.cleanup()
+        }
+        super.onDestroy()
     }
 }
 
@@ -441,7 +455,7 @@ private suspend fun saveDeviceByIp(
                 fw = d.optString("firmware_version").ifBlank { fallbackFw }
             }
             thumbPath = captureThumb(thumbDir, ip)
-            NetSDKManager.logout()
+            // Keep login; logout only on app exit or device delete.
         }
         val existing = db.deviceDao().getByIp(ip)
         if (existing != null) {
@@ -470,25 +484,55 @@ private suspend fun refreshAllDevices(db: AppDatabase, thumbDir: File) {
     withContext(Dispatchers.IO) {
         if (!thumbDir.exists()) thumbDir.mkdirs()
         val allDevices = db.deviceDao().getAllOnce()
-        for (entity in allDevices) {
-            val loginResult = NetSDKManager.login(
-                entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
-            )
-            if (loginResult.isSuccess) {
-                var name = entity.name
-                var model = entity.model
-                var sn = entity.serialNo
-                var fw = entity.firmwareVersion
-                val info = NetSDKManager.getDeviceInfo()
-                if (info.isSuccess && info.data != null) {
-                    val d = info.data!!
-                    name = d.optString("name").ifBlank { entity.name }
-                    model = d.optString("model").ifBlank { entity.model }
-                    sn = d.optString("serial_no").ifBlank { entity.serialNo }
-                    fw = d.optString("firmware_version").ifBlank { entity.firmwareVersion }
-                }
-                val thumbPath = captureThumb(thumbDir, entity.ip).ifBlank { entity.thumbnailPath }
-                db.deviceDao().update(entity.copy(
+        if (allDevices.isEmpty()) return@withContext
+
+        // Parallel ensure-login / info / capture; sessions stay open until app exit.
+        coroutineScope {
+            allDevices.map { entity ->
+                async { refreshOneDevice(db, thumbDir, entity) }
+            }.awaitAll()
+        }
+    }
+}
+
+private suspend fun refreshOneDevice(db: AppDatabase, thumbDir: File, entity: DeviceEntity) {
+    var handle = NetSDKManager.ensureLogin(
+        entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
+    ).data
+
+    if (handle == null || handle == 0L) {
+        db.deviceDao().updateStatus(entity.id, DeviceEntity.STATUS_OFFLINE)
+        return
+    }
+
+    var info = NetSDKManager.getDeviceInfo(handle)
+    if (!info.isSuccess) {
+        // Stale session: reconnect once, keep logged in afterward.
+        NetSDKManager.logout(handle)
+        handle = NetSDKManager.login(
+            entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
+        ).data
+        if (handle == null || handle == 0L) {
+            db.deviceDao().updateStatus(entity.id, DeviceEntity.STATUS_OFFLINE)
+            return
+        }
+        info = NetSDKManager.getDeviceInfo(handle)
+    }
+
+    var name = entity.name
+    var model = entity.model
+    var sn = entity.serialNo
+    var fw = entity.firmwareVersion
+    if (info.isSuccess && info.data != null) {
+        val d = info.data!!
+        name = d.optString("name").ifBlank { entity.name }
+        model = d.optString("model").ifBlank { entity.model }
+        sn = d.optString("serial_no").ifBlank { entity.serialNo }
+        fw = d.optString("firmware_version").ifBlank { entity.firmwareVersion }
+    }
+            val thumbPath = captureThumb(thumbDir, entity.ip, handle).ifBlank { entity.thumbnailPath }
+            db.deviceDao().update(
+                entity.copy(
                     name = name,
                     model = model,
                     serialNo = sn,
@@ -496,18 +540,15 @@ private suspend fun refreshAllDevices(db: AppDatabase, thumbDir: File) {
                     status = DeviceEntity.STATUS_ONLINE,
                     thumbnailPath = thumbPath,
                     updatedAt = System.currentTimeMillis()
-                ))
-                NetSDKManager.logout()
-            } else {
-                db.deviceDao().updateStatus(entity.id, DeviceEntity.STATUS_OFFLINE)
-            }
+                )
+            )
+            // Keep RTP alarm listener for this device while app is alive.
+            AlarmMonitor.ensureListening(entity)
         }
-    }
-}
 
-private suspend fun captureThumb(thumbDir: File, ip: String): String {
+private suspend fun captureThumb(thumbDir: File, ip: String, handle: Long = NetSDKManager.getActiveHandle()): String {
     val file = File(thumbDir, "thumb_${ip.replace('.', '_')}.jpg")
-    val r = NetSDKManager.getThermalCapture(0, file.absolutePath)
+    val r = NetSDKManager.getThermalCapture(0, file.absolutePath, handle)
     return if (r.isSuccess) file.absolutePath else ""
 }
 

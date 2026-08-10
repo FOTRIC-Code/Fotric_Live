@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NetSDKManager
 import com.irtek.netsdk.NetSDKResult
@@ -36,45 +38,50 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Display label for UI; value is SDK format e.g. "UTC+08:00" */
-private data class TimeZoneOption(val value: String, val label: String)
+/** Display label for UI; value is SDK format e.g. "UTC+08:00"; labelRes is the localized city/region name. */
+private data class TimeZoneOption(val value: String, val labelRes: Int)
 
-/** Standard timezone list — UI like Windows/GMT Chinese picker; API uses UTC±HH:MM */
+/** Standard timezone list — UI like Windows/GMT picker; API uses UTC±HH:MM */
 private val standardTimeZones = listOf(
-    TimeZoneOption("UTC-12:00", "(GMT-12:00) 日界线西"),
-    TimeZoneOption("UTC-11:00", "(GMT-11:00) 中途岛，萨摩亚群岛"),
-    TimeZoneOption("UTC-10:00", "(GMT-10:00) 夏威夷"),
-    TimeZoneOption("UTC-09:00", "(GMT-09:00) 阿拉斯加"),
-    TimeZoneOption("UTC-08:00", "(GMT-08:00) 太平洋时间(美国和加拿大)"),
-    TimeZoneOption("UTC-07:00", "(GMT-07:00) 山地时间(美国和加拿大)"),
-    TimeZoneOption("UTC-06:00", "(GMT-06:00) 中部时间(美国和加拿大)"),
-    TimeZoneOption("UTC-05:00", "(GMT-05:00) 东部时间(美国和加拿大)"),
-    TimeZoneOption("UTC-04:00", "(GMT-04:00) 大西洋时间(加拿大)"),
-    TimeZoneOption("UTC-03:30", "(GMT-03:30) 纽芬兰"),
-    TimeZoneOption("UTC-03:00", "(GMT-03:00) 巴西利亚"),
-    TimeZoneOption("UTC-02:00", "(GMT-02:00) 中大西洋"),
-    TimeZoneOption("UTC-01:00", "(GMT-01:00) 亚速尔群岛"),
-    TimeZoneOption("UTC+00:00", "(GMT+00:00) 格林威治标准时间：都柏林，爱丁堡，伦敦"),
-    TimeZoneOption("UTC+01:00", "(GMT+01:00) 阿姆斯特丹，柏林，伯尔尼，罗马，斯德哥尔摩，维也纳"),
-    TimeZoneOption("UTC+02:00", "(GMT+02:00) 雅典，布加勒斯特，伊斯坦布尔"),
-    TimeZoneOption("UTC+03:00", "(GMT+03:00) 莫斯科，圣彼得堡，伏尔加格勒"),
-    TimeZoneOption("UTC+03:30", "(GMT+03:30) 德黑兰"),
-    TimeZoneOption("UTC+04:00", "(GMT+04:00) 阿布扎比，马斯喀特"),
-    TimeZoneOption("UTC+04:30", "(GMT+04:30) 喀布尔"),
-    TimeZoneOption("UTC+05:00", "(GMT+05:00) 叶卡捷琳堡"),
-    TimeZoneOption("UTC+05:30", "(GMT+05:30) 钦奈，加尔各答，孟买，新德里"),
-    TimeZoneOption("UTC+05:45", "(GMT+05:45) 加德满都"),
-    TimeZoneOption("UTC+06:00", "(GMT+06:00) 阿拉木图，新西伯利亚"),
-    TimeZoneOption("UTC+06:30", "(GMT+06:30) 仰光"),
-    TimeZoneOption("UTC+07:00", "(GMT+07:00) 曼谷，河内，雅加达"),
-    TimeZoneOption("UTC+08:00", "(GMT+08:00) 北京，重庆，香港特别行政区，乌鲁木齐"),
-    TimeZoneOption("UTC+09:00", "(GMT+09:00) 大阪，札幌，东京"),
-    TimeZoneOption("UTC+09:30", "(GMT+09:30) 阿德莱德"),
-    TimeZoneOption("UTC+10:00", "(GMT+10:00) 堪培拉，墨尔本，悉尼"),
-    TimeZoneOption("UTC+11:00", "(GMT+11:00) 马加丹，所罗门群岛，新喀里多尼亚"),
-    TimeZoneOption("UTC+12:00", "(GMT+12:00) 奥克兰，惠灵顿"),
-    TimeZoneOption("UTC+13:00", "(GMT+13:00) 努库阿洛法")
+    TimeZoneOption("UTC-12:00", R.string.tz_m12),
+    TimeZoneOption("UTC-11:00", R.string.tz_m11),
+    TimeZoneOption("UTC-10:00", R.string.tz_m10),
+    TimeZoneOption("UTC-09:00", R.string.tz_m09),
+    TimeZoneOption("UTC-08:00", R.string.tz_m08),
+    TimeZoneOption("UTC-07:00", R.string.tz_m07),
+    TimeZoneOption("UTC-06:00", R.string.tz_m06),
+    TimeZoneOption("UTC-05:00", R.string.tz_m05),
+    TimeZoneOption("UTC-04:00", R.string.tz_m04),
+    TimeZoneOption("UTC-03:30", R.string.tz_m0330),
+    TimeZoneOption("UTC-03:00", R.string.tz_m03),
+    TimeZoneOption("UTC-02:00", R.string.tz_m02),
+    TimeZoneOption("UTC-01:00", R.string.tz_m01),
+    TimeZoneOption("UTC+00:00", R.string.tz_p00),
+    TimeZoneOption("UTC+01:00", R.string.tz_p01),
+    TimeZoneOption("UTC+02:00", R.string.tz_p02),
+    TimeZoneOption("UTC+03:00", R.string.tz_p03),
+    TimeZoneOption("UTC+03:30", R.string.tz_p0330),
+    TimeZoneOption("UTC+04:00", R.string.tz_p04),
+    TimeZoneOption("UTC+04:30", R.string.tz_p0430),
+    TimeZoneOption("UTC+05:00", R.string.tz_p05),
+    TimeZoneOption("UTC+05:30", R.string.tz_p0530),
+    TimeZoneOption("UTC+05:45", R.string.tz_p0545),
+    TimeZoneOption("UTC+06:00", R.string.tz_p06),
+    TimeZoneOption("UTC+06:30", R.string.tz_p0630),
+    TimeZoneOption("UTC+07:00", R.string.tz_p07),
+    TimeZoneOption("UTC+08:00", R.string.tz_p08),
+    TimeZoneOption("UTC+09:00", R.string.tz_p09),
+    TimeZoneOption("UTC+09:30", R.string.tz_p0930),
+    TimeZoneOption("UTC+10:00", R.string.tz_p10),
+    TimeZoneOption("UTC+11:00", R.string.tz_p11),
+    TimeZoneOption("UTC+12:00", R.string.tz_p12),
+    TimeZoneOption("UTC+13:00", R.string.tz_p13)
 )
+
+/** Formats "(GMT±HH:MM) City names" using the option's SDK value and localized label. */
+@Composable
+private fun timeZoneDisplayLabel(option: TimeZoneOption): String =
+    "(${option.value.replace("UTC", "GMT")}) ${stringResource(option.labelRes)}"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +118,7 @@ private fun DeviceEditMainPage(onBack: () -> Unit, onNavigate: (String) -> Unit)
 
     Scaffold(
         containerColor = Color(0xFFF4F5F9),
-        topBar = { ConfigTopBar("设备配置", onBack) }
+        topBar = { ConfigTopBar(stringResource(R.string.edit_device_config), onBack) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -122,33 +129,33 @@ private fun DeviceEditMainPage(onBack: () -> Unit, onNavigate: (String) -> Unit)
         ) {
             Spacer(Modifier.height(8.dp))
 
-            SectionLabel("基本配置")
+            SectionLabel(stringResource(R.string.edit_basic))
             ConfigCard {
-                NavRow("时间配置") { onNavigate("time") }
+                NavRow(stringResource(R.string.edit_time)) { onNavigate("time") }
                 SettingDivider()
-                NavRow("单位配置") { onNavigate("unit") }
+                NavRow(stringResource(R.string.edit_unit)) { onNavigate("unit") }
                 SettingDivider()
-                NavRow("网络配置") { onNavigate("network") }
+                NavRow(stringResource(R.string.edit_network)) { onNavigate("network") }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            SectionLabel("图像配置")
+            SectionLabel(stringResource(R.string.edit_image_config))
             ConfigCard {
-                NavRow("显示配置") { onNavigate("display") }
+                NavRow(stringResource(R.string.edit_display)) { onNavigate("display") }
                 SettingDivider()
-                NavRow("OSD 配置") { onNavigate("osd") }
+                NavRow(stringResource(R.string.edit_osd)) { onNavigate("osd") }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            SectionLabel("热像配置")
+            SectionLabel(stringResource(R.string.edit_thermal))
             ConfigCard {
-                NavRow("基本配置") { onNavigate("thermal_basic") }
+                NavRow(stringResource(R.string.edit_basic)) { onNavigate("thermal_basic") }
                 SettingDivider()
-                NavRow("OSD 配置") { onNavigate("thermal_osd") }
+                NavRow(stringResource(R.string.edit_osd)) { onNavigate("thermal_osd") }
                 SettingDivider()
-                NavRow("ROI 配置") { onNavigate("roi") }
+                NavRow(stringResource(R.string.edit_roi)) { onNavigate("roi") }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -199,8 +206,8 @@ private fun TimeConfigPage(onBack: () -> Unit) {
     }
 
     BackHandler { onBack() }
-    SubPageScaffold("时间配置", onBack, isLoading) {
-        SectionLabel("时区配置")
+    SubPageScaffold(stringResource(R.string.edit_time), onBack, isLoading) {
+        SectionLabel(stringResource(R.string.edit_timezone_config))
         ConfigCard {
             val selectedTz = standardTimeZones.find { it.value == timeZone }
                 ?: standardTimeZones.find { it.value == "UTC+08:00" }!!
@@ -213,8 +220,8 @@ private fun TimeConfigPage(onBack: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        val timeModes = listOf("手动", "NTP")
-        SectionLabel("时间模式")
+        val timeModes = listOf(stringResource(R.string.common_manual), "NTP")
+        SectionLabel(stringResource(R.string.edit_time_mode))
         ConfigCard {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 timeModes.forEachIndexed { idx, label ->
@@ -235,7 +242,7 @@ private fun TimeConfigPage(onBack: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         if (timeMode == 0) {
-            SectionLabel("本地时间")
+            SectionLabel(stringResource(R.string.edit_local_time))
             ConfigCard {
                 Row(
                     modifier = Modifier
@@ -243,7 +250,7 @@ private fun TimeConfigPage(onBack: () -> Unit) {
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("日期时间", fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.edit_datetime), fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
                     BasicTextField(
                         value = localTime,
                         onValueChange = { localTime = it },
@@ -269,18 +276,18 @@ private fun TimeConfigPage(onBack: () -> Unit) {
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
-                        Text("同步", fontSize = 13.sp, color = Color(0xFF2673F9))
+                        Text(stringResource(R.string.common_sync), fontSize = 13.sp, color = Color(0xFF2673F9))
                     }
                 }
             }
         } else {
-            SectionLabel("NTP 服务器")
+            SectionLabel(stringResource(R.string.edit_ntp_server))
             ConfigCard {
-                EditRow("服务器地址", ntpHost) { ntpHost = it }
+                EditRow(stringResource(R.string.edit_server_address), ntpHost) { ntpHost = it }
                 SettingDivider()
-                EditRow("端口号", ntpPort, KeyboardType.Number) { ntpPort = it }
+                EditRow(stringResource(R.string.common_port), ntpPort, KeyboardType.Number) { ntpPort = it }
                 SettingDivider()
-                EditRow("同步间隔(秒)", ntpInterval, KeyboardType.Number) { ntpInterval = it }
+                EditRow(stringResource(R.string.edit_sync_interval), ntpInterval, KeyboardType.Number) { ntpInterval = it }
             }
         }
 
@@ -302,7 +309,11 @@ private fun TimeConfigPage(onBack: () -> Unit) {
                     }
                     NetSDKManager.setNtpServer(0, ntpJson.toString())
                 }
-                Toast.makeText(context, if (tr.isSuccess) "保存成功" else "保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (tr.isSuccess) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
                 if (tr.isSuccess) onBack()
             }
         }
@@ -334,11 +345,15 @@ private fun UnitConfigPage(onBack: () -> Unit) {
     }
 
     BackHandler { onBack() }
-    SubPageScaffold("单位配置", onBack, isLoading) {
-        val tempLabels = listOf("℃ 摄氏度", "K 开尔文", "℉ 华氏度")
-        val distLabels = listOf("米 (m)", "英尺 (ft)")
+    SubPageScaffold(stringResource(R.string.edit_unit), onBack, isLoading) {
+        val tempLabels = listOf(
+            stringResource(R.string.edit_temp_c),
+            stringResource(R.string.edit_temp_k),
+            stringResource(R.string.edit_temp_f)
+        )
+        val distLabels = listOf(stringResource(R.string.edit_dist_m), stringResource(R.string.edit_dist_ft))
 
-        SectionLabel("温度单位")
+        SectionLabel(stringResource(R.string.edit_temp_unit))
         ConfigCard {
             tempLabels.forEachIndexed { idx, label ->
                 RadioRow(label, tempUnit == idx) { tempUnit = idx }
@@ -348,7 +363,7 @@ private fun UnitConfigPage(onBack: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        SectionLabel("距离单位")
+        SectionLabel(stringResource(R.string.edit_dist_unit))
         ConfigCard {
             distLabels.forEachIndexed { idx, label ->
                 RadioRow(label, distUnit == idx) { distUnit = idx }
@@ -365,7 +380,11 @@ private fun UnitConfigPage(onBack: () -> Unit) {
                     put("distance_unit", distUnit)
                 }
                 val r = NetSDKManager.setThermalUnit(json.toString())
-                Toast.makeText(context, if (r.isSuccess) "保存成功" else "保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (r.isSuccess) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
                 if (r.isSuccess) onBack()
             }
         }
@@ -415,28 +434,28 @@ private fun NetworkConfigPage(onBack: () -> Unit) {
     }
 
     BackHandler { onBack() }
-    SubPageScaffold("网络配置", onBack, isLoading) {
-        SectionLabel("网络")
+    SubPageScaffold(stringResource(R.string.edit_network), onBack, isLoading) {
+        SectionLabel(stringResource(R.string.edit_network_section))
         ConfigCard {
             val netEditable = dhcp != 1
             SwitchRow("DHCP", dhcp == 1) { dhcp = if (it) 1 else 0 }
             SettingDivider()
-            EditRow("IP 地址", ip, enabled = netEditable) { ip = it }
+            EditRow(stringResource(R.string.common_ip_address), ip, enabled = netEditable) { ip = it }
             SettingDivider()
-            EditRow("子网掩码", netmask, enabled = netEditable) { netmask = it }
+            EditRow(stringResource(R.string.edit_netmask), netmask, enabled = netEditable) { netmask = it }
             SettingDivider()
-            EditRow("网关", gateway, enabled = netEditable) { gateway = it }
+            EditRow(stringResource(R.string.edit_gateway), gateway, enabled = netEditable) { gateway = it }
             SettingDivider()
             EditRow("DNS", dns, enabled = netEditable) { dns = it }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        SectionLabel("端口")
+        SectionLabel(stringResource(R.string.edit_ports))
         ConfigCard {
-            EditRow("HTTP 端口", httpPort, KeyboardType.Number) { httpPort = it }
+            EditRow(stringResource(R.string.edit_http_port), httpPort, KeyboardType.Number) { httpPort = it }
             SettingDivider()
-            EditRow("RTSP 端口", rtspPort, KeyboardType.Number) { rtspPort = it }
+            EditRow(stringResource(R.string.edit_rtsp_port), rtspPort, KeyboardType.Number) { rtspPort = it }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -458,7 +477,11 @@ private fun NetworkConfigPage(onBack: () -> Unit) {
                 }
                 val pr = NetSDKManager.setPort(portJson.toString())
                 val ok = nr.isSuccess && pr.isSuccess
-                Toast.makeText(context, if (ok) "保存成功" else "保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (ok) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
                 if (ok) onBack()
             }
         }
@@ -537,25 +560,25 @@ private fun DisplayConfigPage(onBack: () -> Unit) {
     }
 
     BackHandler { onBack() }
-    SubPageScaffold("显示配置", onBack, isLoading) {
-        SectionLabel("图像参数")
+    SubPageScaffold(stringResource(R.string.edit_display), onBack, isLoading) {
+        SectionLabel(stringResource(R.string.edit_image_params))
         ConfigCard {
-            SliderRow("对比度", contrast.toIntOrNull() ?: 50, 0, 100) { contrast = it.toString() }
+            SliderRow(stringResource(R.string.edit_contrast), contrast.toIntOrNull() ?: 50, 0, 100) { contrast = it.toString() }
             SettingDivider()
-            SliderRow("亮度", brightness.toIntOrNull() ?: 50, 0, 100) { brightness = it.toString() }
+            SliderRow(stringResource(R.string.edit_brightness), brightness.toIntOrNull() ?: 50, 0, 100) { brightness = it.toString() }
             SettingDivider()
-            SwitchRow("DDE 增强", ddeEnable == 1) { ddeEnable = if (it) 1 else 0 }
+            SwitchRow(stringResource(R.string.edit_dde), ddeEnable == 1) { ddeEnable = if (it) 1 else 0 }
             if (ddeEnable == 1) {
                 SettingDivider()
-                SliderRow("DDE 强度", ddeValue.toIntOrNull() ?: 0, 0, 100) { ddeValue = it.toString() }
+                SliderRow(stringResource(R.string.edit_dde_strength), ddeValue.toIntOrNull() ?: 0, 0, 100) { ddeValue = it.toString() }
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        SectionLabel("成像方式")
+        SectionLabel(stringResource(R.string.edit_imaging))
         ConfigCard {
-            val gainModes = listOf(2 to "自动温宽", 1 to "手动温宽")
+            val gainModes = listOf(2 to stringResource(R.string.edit_gain_auto), 1 to stringResource(R.string.edit_gain_manual))
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 gainModes.forEach { (mode, label) ->
                     FilterChip(
@@ -572,12 +595,12 @@ private fun DisplayConfigPage(onBack: () -> Unit) {
             }
             if (gainMode == 1) {
                 SettingDivider()
-                EditRow("温宽上限", gainMax, KeyboardType.Decimal, suffix = tempUnitSuffix) { gainMax = it }
+                EditRow(stringResource(R.string.edit_gain_high), gainMax, KeyboardType.Decimal, suffix = tempUnitSuffix) { gainMax = it }
                 SettingDivider()
-                EditRow("温宽下限", gainMin, KeyboardType.Decimal, suffix = tempUnitSuffix) { gainMin = it }
+                EditRow(stringResource(R.string.edit_gain_low), gainMin, KeyboardType.Decimal, suffix = tempUnitSuffix) { gainMin = it }
             }
             SettingDivider()
-            SwitchRow("高低温均衡成像 (TWB)", twbEnabled) {
+            SwitchRow(stringResource(R.string.edit_twb), twbEnabled) {
                 twbEnabled = it
                 colorDistType = if (it) 1 else 2
             }
@@ -586,8 +609,13 @@ private fun DisplayConfigPage(onBack: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         // SDK: NONE=0, UP_DOWN=1, LEFT_RIGHT=2, CENTER=3
-        val flipLabels = listOf("正常", "上下翻转", "左右翻转", "中心翻转")
-        SectionLabel("画面翻转")
+        val flipLabels = listOf(
+            stringResource(R.string.edit_flip_normal),
+            stringResource(R.string.edit_flip_ud),
+            stringResource(R.string.edit_flip_lr),
+            stringResource(R.string.edit_flip_center)
+        )
+        SectionLabel(stringResource(R.string.edit_flip))
         ConfigCard {
             flipLabels.forEachIndexed { idx, label ->
                 RadioRow(label, flipMode == idx) { flipMode = idx }
@@ -617,7 +645,11 @@ private fun DisplayConfigPage(onBack: () -> Unit) {
                 val gr = NetSDKManager.setThermalGain(gainJson.toString())
                 val cr = NetSDKManager.setThermalColorDist(if (twbEnabled) 1 else 2)
                 val ok = ir.isSuccess && fr.isSuccess && gr.isSuccess && cr.isSuccess
-                Toast.makeText(context, if (ok) "保存成功" else "保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (ok) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
                 if (ok) onBack()
             }
         }
@@ -638,13 +670,13 @@ private fun ThermalBasicConfigPage(onBack: () -> Unit) {
         "params" -> ThermalParamsDetailPage(onBack = { detail = null })
         else -> {
             BackHandler { onBack() }
-            SubPageScaffold("热像基本配置", onBack, false) {
+            SubPageScaffold(stringResource(R.string.edit_thermal_basic), onBack, false) {
                 ConfigCard {
-                    NavRow("测温量程") { detail = "range" }
+                    NavRow(stringResource(R.string.edit_range)) { detail = "range" }
                     SettingDivider()
-                    NavRow("校正模式") { detail = "shutter" }
+                    NavRow(stringResource(R.string.edit_shutter)) { detail = "shutter" }
                     SettingDivider()
-                    NavRow("全局测温参数") { detail = "params" }
+                    NavRow(stringResource(R.string.edit_params)) { detail = "params" }
                 }
             }
         }
@@ -696,15 +728,15 @@ private fun ThermalRangeDetailPage(onBack: () -> Unit) {
     }
 
     BackHandler { onBack() }
-    SubPageScaffold("测温量程", onBack, isLoading) {
+    SubPageScaffold(stringResource(R.string.edit_range), onBack, isLoading) {
         if (rangeOptions.isEmpty()) {
             ConfigCard {
                 Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("暂无可用量程", fontSize = 14.sp, color = AppColors.TextSecondary)
+                    Text(stringResource(R.string.edit_no_range), fontSize = 14.sp, color = AppColors.TextSecondary)
                 }
             }
         } else {
-            SectionLabel("选择量程")
+            SectionLabel(stringResource(R.string.edit_select_range))
             ConfigCard {
                 rangeOptions.forEachIndexed { idx, (id, label) ->
                     RadioRow(label, selectedRangeId == id) { selectedRangeId = id }
@@ -715,7 +747,11 @@ private fun ThermalRangeDetailPage(onBack: () -> Unit) {
             SaveButton {
                 scope.launch {
                     val r = NetSDKManager.setThermalRange(selectedRangeId)
-                    Toast.makeText(context, if (r.isSuccess) "保存成功" else "保存失败", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        if (r.isSuccess) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     if (r.isSuccess) onBack()
                 }
             }
@@ -743,10 +779,10 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
     }
 
     BackHandler { onBack() }
-    SubPageScaffold("校正模式", onBack, isLoading) {
-        SectionLabel("校正模式")
+    SubPageScaffold(stringResource(R.string.edit_shutter), onBack, isLoading) {
+        SectionLabel(stringResource(R.string.edit_shutter))
         ConfigCard {
-            val modes = listOf(0 to "自动", 1 to "手动")
+            val modes = listOf(0 to stringResource(R.string.common_auto), 1 to stringResource(R.string.common_manual))
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 modes.forEach { (mode, label) ->
                     FilterChip(
@@ -763,7 +799,7 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
             }
             if (shutterMode == 0) {
                 SettingDivider()
-                EditRow("自动校正间隔", shutterInterval, KeyboardType.Number, suffix = "秒") {
+                EditRow(stringResource(R.string.edit_auto_interval), shutterInterval, KeyboardType.Number, suffix = stringResource(R.string.common_seconds)) {
                     shutterInterval = it
                 }
             }
@@ -777,7 +813,7 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
                         val r = NetSDKManager.thermalCalibrate()
                         Toast.makeText(
                             context,
-                            if (r.isSuccess) "已执行校正" else "校正失败",
+                            if (r.isSuccess) context.getString(R.string.edit_calibrate_ok) else context.getString(R.string.edit_calibrate_fail),
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -786,7 +822,7 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2673F9))
             ) {
-                Text("立即校正", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.edit_calibrate_now), fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
         }
 
@@ -800,7 +836,11 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
                     NetSDKResult(0, Unit)
                 }
                 val ok = mr.isSuccess && tr.isSuccess
-                Toast.makeText(context, if (ok) "保存成功" else "保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (ok) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
                 if (ok) onBack()
             }
         }
@@ -851,18 +891,18 @@ private fun ThermalParamsDetailPage(onBack: () -> Unit) {
     }
 
     BackHandler { onBack() }
-    SubPageScaffold("全局测温参数", onBack, isLoading) {
-        SectionLabel("测温参数")
+    SubPageScaffold(stringResource(R.string.edit_params), onBack, isLoading) {
+        SectionLabel(stringResource(R.string.edit_measure_params))
         ConfigCard {
-            EditRow("发射率", emissivity, KeyboardType.Decimal) { emissivity = it }
+            EditRow(stringResource(R.string.edit_emissivity), emissivity, KeyboardType.Decimal) { emissivity = it }
             SettingDivider()
-            EditRow("距离", distance, KeyboardType.Decimal, suffix = distUnit) { distance = it }
+            EditRow(stringResource(R.string.edit_distance), distance, KeyboardType.Decimal, suffix = distUnit) { distance = it }
             SettingDivider()
-            EditRow("反射温度", reflTemp, KeyboardType.Decimal, suffix = tempUnit) { reflTemp = it }
+            EditRow(stringResource(R.string.edit_refl_temp), reflTemp, KeyboardType.Decimal, suffix = tempUnit) { reflTemp = it }
             SettingDivider()
-            EditRow("大气温度", atmTemp, KeyboardType.Decimal, suffix = tempUnit) { atmTemp = it }
+            EditRow(stringResource(R.string.edit_atm_temp), atmTemp, KeyboardType.Decimal, suffix = tempUnit) { atmTemp = it }
             SettingDivider()
-            EditRow("相对湿度", relHumidity, KeyboardType.Decimal, suffix = "%") { relHumidity = it }
+            EditRow(stringResource(R.string.edit_humidity), relHumidity, KeyboardType.Decimal, suffix = "%") { relHumidity = it }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -878,7 +918,11 @@ private fun ThermalParamsDetailPage(onBack: () -> Unit) {
                     put("rel_humidity", (humidityPct / 100.0).coerceIn(0.0, 1.0))
                 }
                 val r = NetSDKManager.setThermalParams(json.toString())
-                Toast.makeText(context, if (r.isSuccess) "保存成功" else "保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (r.isSuccess) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
                 if (r.isSuccess) onBack()
             }
         }
@@ -903,7 +947,7 @@ private fun ConfigTopBar(title: String, onBack: () -> Unit) {
         },
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回",
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
                     tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
             }
         },
@@ -996,10 +1040,10 @@ private fun TimeZoneDropdownRow(
                 .padding(horizontal = 20.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("时区", fontSize = 15.sp, color = AppColors.TextPrimary)
+            Text(stringResource(R.string.edit_timezone), fontSize = 15.sp, color = AppColors.TextPrimary)
             Spacer(Modifier.width(12.dp))
             Text(
-                selected.label,
+                timeZoneDisplayLabel(selected),
                 fontSize = 14.sp,
                 color = AppColors.TextPrimary,
                 modifier = Modifier.weight(1f),
@@ -1028,7 +1072,7 @@ private fun TimeZoneDropdownRow(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            option.label,
+                            timeZoneDisplayLabel(option),
                             fontSize = 14.sp,
                             color = AppColors.TextPrimary,
                             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
@@ -1216,7 +1260,7 @@ private fun SaveButton(onClick: () -> Unit) {
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2673F9))
     ) {
-        Text("保存", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text(stringResource(R.string.common_save), fontSize = 16.sp, fontWeight = FontWeight.Medium)
     }
 }
 

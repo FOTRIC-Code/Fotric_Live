@@ -16,10 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.launch
@@ -55,12 +57,12 @@ fun OnlineAddScreen(
             TopAppBar(
                 title = {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("在线添加", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text(stringResource(R.string.add_online), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
                     }
                 },
                 actions = { Spacer(Modifier.width(48.dp)) },
@@ -83,7 +85,7 @@ fun OnlineAddScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (isSearching) "正在搜索局域网设备..." else "搜索完成，发现 $deviceCount 台设备",
+                    if (isSearching) stringResource(R.string.add_searching) else String.format(stringResource(R.string.add_search_done), deviceCount),
                     fontSize = 13.sp,
                     color = AppColors.TextSecondary
                 )
@@ -91,9 +93,9 @@ fun OnlineAddScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { doSearch() }
                 ) {
-                    Text("刷新", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF2673F9))
+                    Text(stringResource(R.string.common_refresh), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF2673F9))
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Filled.Refresh, contentDescription = "刷新", tint = Color(0xFF2673F9), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.common_refresh), tint = Color(0xFF2673F9), modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -104,7 +106,7 @@ fun OnlineAddScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(top = 14.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)) {
-                    Text("搜索结果", fontSize = 14.sp, fontWeight = FontWeight.Normal, color = AppColors.TextPrimary)
+                    Text(stringResource(R.string.add_search_results), fontSize = 14.sp, fontWeight = FontWeight.Normal, color = AppColors.TextPrimary)
                     Spacer(Modifier.height(8.dp))
 
                     if (isSearching) {
@@ -113,7 +115,7 @@ fun OnlineAddScreen(
                         }
                     } else if (deviceCount == 0) {
                         Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
-                            Text("未发现设备", fontSize = 14.sp, color = AppColors.TextSecondary)
+                            Text(stringResource(R.string.add_no_device), fontSize = 14.sp, color = AppColors.TextSecondary)
                         }
                     } else {
                         val arr = devices!!
@@ -170,11 +172,11 @@ private fun DeviceResultRow(device: JSONObject, onAdd: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(3.dp))
-            Text("IP 地址：$ip", fontSize = 13.sp, color = AppColors.TextSecondary)
+            Text(String.format(stringResource(R.string.add_ip_prefix), ip), fontSize = 13.sp, color = AppColors.TextSecondary)
             Spacer(Modifier.height(2.dp))
-            Text("序列号：$serialNo", fontSize = 13.sp, color = AppColors.TextSecondary)
+            Text(String.format(stringResource(R.string.add_serial_prefix), serialNo), fontSize = 13.sp, color = AppColors.TextSecondary)
             Spacer(Modifier.height(2.dp))
-            Text("固件：$fwVersion", fontSize = 13.sp, color = AppColors.TextSecondary)
+            Text(String.format(stringResource(R.string.add_firmware_prefix), fwVersion), fontSize = 13.sp, color = AppColors.TextSecondary)
         }
 
         Box(
@@ -186,7 +188,7 @@ private fun DeviceResultRow(device: JSONObject, onAdd: () -> Unit) {
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("添加", fontSize = 13.sp, color = Color(0xFF2673F9), fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.common_add), fontSize = 13.sp, color = Color(0xFF2673F9), fontWeight = FontWeight.Medium)
         }
     }
 }

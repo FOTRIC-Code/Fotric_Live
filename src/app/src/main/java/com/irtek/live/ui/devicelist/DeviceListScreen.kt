@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.res.stringResource
+import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.live.ui.theme.AppSpacing
 import com.irtek.live.ui.theme.AppTypo
@@ -73,15 +75,19 @@ fun DeviceListScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    val tabs = remember(devices) {
+    val tabAllFmt = stringResource(R.string.device_tab_all)
+    val tabOnlineFmt = stringResource(R.string.device_tab_online)
+    val tabOfflineFmt = stringResource(R.string.device_tab_offline)
+    val tabAlarmFmt = stringResource(R.string.device_tab_alarm)
+    val tabs = remember(devices, tabAllFmt, tabOnlineFmt, tabOfflineFmt, tabAlarmFmt) {
         val onlineCount = devices.count { it.status == DeviceStatus.ONLINE }
         val offlineCount = devices.count { it.status == DeviceStatus.OFFLINE }
         val alarmCount = devices.count { it.status == DeviceStatus.ALARM }
         listOf(
-            "全部(${devices.size})",
-            "在线($onlineCount)",
-            "离线($offlineCount)",
-            "告警($alarmCount)"
+            String.format(tabAllFmt, devices.size),
+            String.format(tabOnlineFmt, onlineCount),
+            String.format(tabOfflineFmt, offlineCount),
+            String.format(tabAlarmFmt, alarmCount)
         )
     }
 
@@ -156,7 +162,11 @@ fun DeviceListScreen(
                     items(filteredDevices, key = { it.id }) { device ->
                         DeviceCard(
                             device = device,
-                            onClick = { onDeviceClick(device) },
+                            onClick = {
+                                if (device.status != DeviceStatus.OFFLINE) {
+                                    onDeviceClick(device)
+                                }
+                            },
                             onDelete = { onDeleteDevice(device) },
                             onEditDevice = { onEditDevice(device) },
                             onAlarmConfig = { onAlarmConfig(device) },
@@ -180,7 +190,7 @@ private fun TitleBar(onAdd: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
-            "设备",
+            stringResource(R.string.device_title),
             fontSize = AppTypo.TitleSize,
             fontWeight = FontWeight.Bold,
             color = AppColors.TextPrimary
@@ -188,7 +198,7 @@ private fun TitleBar(onAdd: () -> Unit) {
         IconButton(onClick = onAdd) {
             Icon(
                 Icons.Default.Add,
-                contentDescription = "添加设备",
+                contentDescription = stringResource(R.string.device_add),
                 tint = AppColors.TextPrimary,
                 modifier = Modifier.size(22.dp)
             )
@@ -239,11 +249,15 @@ private fun DeviceCard(
     onMaintenance: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val canOpen = device.status != DeviceStatus.OFFLINE
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .then(
+                if (canOpen) Modifier.clickable(onClick = onClick)
+                else Modifier
+            ),
         shape = RoundedCornerShape(AppSpacing.CardCorner),
         colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -273,7 +287,7 @@ private fun DeviceCard(
                     if (bitmap != null) {
                         androidx.compose.foundation.Image(
                             bitmap = bitmap!!,
-                            contentDescription = "设备截图",
+                            contentDescription = stringResource(R.string.device_thumb_cd),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -328,7 +342,7 @@ private fun DeviceCard(
                 Box {
                     Icon(
                         Icons.Default.MoreVert,
-                        contentDescription = "更多",
+                        contentDescription = stringResource(R.string.common_more),
                         tint = AppColors.TextSecondary,
                         modifier = Modifier
                             .size(20.dp)
@@ -366,13 +380,13 @@ private fun DevicePopupMenu(
         containerColor = Color.White,
         shadowElevation = 8.dp
     ) {
-        DeviceMenuItem("编辑设备", AppColors.TextPrimary, onEditDevice)
+        DeviceMenuItem(stringResource(R.string.device_menu_edit), AppColors.TextPrimary, onEditDevice)
         MenuDivider()
-        DeviceMenuItem("报警配置", AppColors.TextPrimary, onAlarmConfig)
+        DeviceMenuItem(stringResource(R.string.device_menu_alarm), AppColors.TextPrimary, onAlarmConfig)
         MenuDivider()
-        DeviceMenuItem("设备维护", AppColors.TextPrimary, onMaintenance)
+        DeviceMenuItem(stringResource(R.string.device_menu_maintenance), AppColors.TextPrimary, onMaintenance)
         MenuDivider()
-        DeviceMenuItem("删除设备", Color(0xFFDC2626), onDelete)
+        DeviceMenuItem(stringResource(R.string.device_menu_delete), Color(0xFFDC2626), onDelete)
     }
 }
 
@@ -405,9 +419,9 @@ private fun MenuDivider() {
 @Composable
 private fun StatusBadge(status: DeviceStatus) {
     val (text, textColor, bgColor) = when (status) {
-        DeviceStatus.ONLINE -> Triple("在线", AppColors.BadgeOnline, AppColors.BadgeOnlineBg)
-        DeviceStatus.OFFLINE -> Triple("离线", AppColors.BadgeOffline, AppColors.BadgeOfflineBg)
-        DeviceStatus.ALARM -> Triple("告警", AppColors.BadgeAlarm, AppColors.BadgeAlarmBg)
+        DeviceStatus.ONLINE -> Triple(stringResource(R.string.device_status_online), AppColors.BadgeOnline, AppColors.BadgeOnlineBg)
+        DeviceStatus.OFFLINE -> Triple(stringResource(R.string.device_status_offline), AppColors.BadgeOffline, AppColors.BadgeOfflineBg)
+        DeviceStatus.ALARM -> Triple(stringResource(R.string.device_status_alarm), AppColors.BadgeAlarm, AppColors.BadgeAlarmBg)
     }
     Box(
         modifier = Modifier
@@ -422,10 +436,10 @@ private fun StatusBadge(status: DeviceStatus) {
 @Composable
 private fun BottomNavBar(selected: Int, onSelect: (Int) -> Unit) {
     val items = listOf(
-        NavItem("设备", NavIcon.DEVICE),
-        NavItem("消息", NavIcon.MESSAGE),
-        NavItem("图库", NavIcon.GALLERY),
-        NavItem("我的", NavIcon.PROFILE)
+        NavItem(stringResource(R.string.nav_devices), NavIcon.DEVICE),
+        NavItem(stringResource(R.string.nav_messages), NavIcon.MESSAGE),
+        NavItem(stringResource(R.string.nav_gallery), NavIcon.GALLERY),
+        NavItem(stringResource(R.string.nav_mine), NavIcon.PROFILE)
     )
     Column {
         HorizontalDivider(thickness = 0.5.dp, color = AppColors.BottomNavBorder)
@@ -474,11 +488,5 @@ private fun NavIconView(icon: NavIcon, active: Boolean) {
         NavIcon.GALLERY -> Icons.Filled.PhotoLibrary
         NavIcon.PROFILE -> Icons.Filled.PersonOutline
     }
-    val desc = when (icon) {
-        NavIcon.DEVICE -> "设备"
-        NavIcon.MESSAGE -> "消息"
-        NavIcon.GALLERY -> "图库"
-        NavIcon.PROFILE -> "我的"
-    }
-    Icon(imageVector = imageVector, contentDescription = desc, tint = tint, modifier = Modifier.size(24.dp))
+    Icon(imageVector = imageVector, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
 }
