@@ -10,9 +10,8 @@ Live.Android/
 │   ├── settings.gradle
 │   ├── build.gradle
 │   ├── gradle/
+│   ├── repo/                            # 本地 Maven（com.irtek:netsdk AAR+POM）
 │   ├── app/
-│   │   ├── libs/
-│   │   │   └── IRtekNetSDK-release.aar
 │   │   ├── build.gradle
 │   │   └── src/main/
 │   │       ├── AndroidManifest.xml

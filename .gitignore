@@ -17,6 +17,7 @@ hs_err_pid*
 *.ap_
 *.aab
 *.aar
+!src/repo/**/*.aar
 *.dex
 
 # Generated / build output

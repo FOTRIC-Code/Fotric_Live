@@ -41,7 +41,7 @@ android {
 }
 
 dependencies {
-    implementation project(':IRtekNetSDK')
+    implementation "com.irtek:netsdk:${findProperty('IRTEK_NETSDK_VERSION')}"
 
     implementation libs.androidx.core.ktx
     implementation libs.androidx.lifecycle.runtime.ktx

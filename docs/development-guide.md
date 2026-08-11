@@ -20,11 +20,10 @@ Live.Android 是一款红外热像设备管理 Android 应用，使用 Kotlin + 
 
 ```
 Live.Android (app)
-├── IRtekNetSDK (源码模块, JNI/C++)
-│   ├── NativeSDK.kt (JNI 桥接)
-│   ├── NetSDKManager.kt (Kotlin API 层)
-│   └── libirtek_netsdk.so (CMake 编译的原生库)
-│       └── ffmpeg-kit-min-gpl:5.1.LTS (视频编解码)
+├── com.irtek:netsdk:${IRTEK_NETSDK_VERSION}（本地 Maven：src/repo 下的 AAR + POM）
+│   ├── NativeSDK / NetSDKManager
+│   └── libirtek_netsdk.so
+│       └── ffmpeg-kit-min-gpl:5.1.LTS（POM 传递依赖）
 ├── Jetpack Compose (UI 框架)
 ├── Room (本地数据库)
 └── Kotlin Coroutines (异步)
@@ -32,20 +31,48 @@ Live.Android (app)
 
 ### SDK 引用方式
 
-在 `settings.gradle` 中以源码模块引入：
+应用**不再编译** IRtekNetSDK 源码。版本号只写在 `src/gradle.properties`：
 
-```groovy
-include ':IRtekNetSDK'
-project(':IRtekNetSDK').projectDir = new File('F:/Volga.IRtekNetSDK/android')
+```
+IRTEK_NETSDK_VERSION=1.0.1.61
 ```
 
-在 `app/build.gradle` 中依赖：
-
-```groovy
-implementation project(':IRtekNetSDK')
+```
+src/repo/com/irtek/netsdk/<version>/netsdk-<version>.aar
+src/repo/com/irtek/netsdk/<version>/netsdk-<version>.pom
 ```
 
-> **注意**：不要使用 `IRtekNetSDK-release.aar`，该 AAR 是旧版 OkHttp/Gson 封装，存在 JSON 反序列化 bug（未提取 `data` 字段导致所有属性为空）。必须使用源码模块。
+`settings.gradle`：
+
+```groovy
+maven { url uri("${rootDir}/repo") }
+```
+
+`app/build.gradle`：
+
+```groovy
+implementation "com.irtek:netsdk:${findProperty('IRTEK_NETSDK_VERSION')}"
+```
+
+### 更新 SDK AAR
+
+**TeamCity（推荐）**：IRtekNetSDK 构建在 `build_netsdk.bat` 之后增加一步 `Push AAR to Live.Android`（见 SDK 仓库 `builder/teamcity-push-to-live.md`）。编译成功后会自动 commit/push 到 Live 的 `dev`：覆盖 `src/repo`，并改 `IRTEK_NETSDK_VERSION`。Live 对 `dev` 开 VCS trigger 即可接着打 APK。
+
+本地手动发布：
+
+```bat
+gradlew :IRtekNetSDK:publishReleasePublicationToLocalBuildRepository
+```
+
+```powershell
+Copy-Item -Recurse -Force `
+  F:\Volga.IRtekNetSDK\android\IRtekNetSDK\build\repo\* `
+  F:\Live.Android\src\repo\
+```
+
+然后把 `src/gradle.properties` 里的 `IRTEK_NETSDK_VERSION` 改成 Maven 目录名（例如 `1.0.1.61`）。
+
+> 不要使用旧版 `IRtekNetSDK-release.aar`（OkHttp/Gson 封装）。必须使用当前 JNI 模块打出的 `com.irtek:netsdk`。
 
 ### Maven 仓库
 

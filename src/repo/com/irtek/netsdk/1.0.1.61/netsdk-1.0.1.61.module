@@ -1,0 +1,90 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.irtek",
+    "module": "netsdk",
+    "version": "1.0.1.61",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "7.6.3"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "netsdk-1.0.1.61.aar",
+          "url": "netsdk-1.0.1.61.aar",
+          "size": 3294567,
+          "sha512": "d55599b85cc85abff5f78600949ec125dd53e431e11e79f2a78a358082c78d857bab38c8d123086185e89cbfd421b2660616c3271afbf7c1e3cc57eab4ce0f15",
+          "sha256": "09c42504c0aac1ec1ec3f2dab3595e209196497b2cf9b4dec95ceb5d0865c1bd",
+          "sha1": "23772a555a984fe04345896b5bd463a80a9dcaff",
+          "md5": "1f5eab193999e8ac7e4605fc13346efe"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-android",
+          "version": {
+            "requires": "1.7.3"
+          }
+        },
+        {
+          "group": "com.arthenica",
+          "module": "ffmpeg-kit-min-gpl",
+          "version": {
+            "requires": "5.1.LTS"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "netsdk-1.0.1.61.aar",
+          "url": "netsdk-1.0.1.61.aar",
+          "size": 3294567,
+          "sha512": "d55599b85cc85abff5f78600949ec125dd53e431e11e79f2a78a358082c78d857bab38c8d123086185e89cbfd421b2660616c3271afbf7c1e3cc57eab4ce0f15",
+          "sha256": "09c42504c0aac1ec1ec3f2dab3595e209196497b2cf9b4dec95ceb5d0865c1bd",
+          "sha1": "23772a555a984fe04345896b5bd463a80a9dcaff",
+          "md5": "1f5eab193999e8ac7e4605fc13346efe"
+        }
+      ]
+    }
+  ]
+}
