@@ -34,7 +34,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.res.stringResource
 import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors

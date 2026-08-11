@@ -25,6 +25,7 @@ data class AlarmMessage(
     val temperature: Double = 0.0,
     val threshold: Double = 0.0,
     val markerName: String = "",
+    val imagePath: String = "",
     val isRead: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
 )

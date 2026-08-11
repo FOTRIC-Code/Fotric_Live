@@ -26,12 +26,12 @@ import com.irtek.live.ui.preview.PreviewDevice
 import com.irtek.live.ui.preview.PreviewScreen
 import com.irtek.live.ui.theme.LiveTheme
 import com.irtek.netsdk.NetSDKManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.io.File
 
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
                         MessageItem(
                             alarm = alarm,
                             deviceName = device?.name ?: unknownDeviceName,
-                            thumbnailPath = device?.thumbnailPath ?: ""
+                            thumbnailPath = alarm.imagePath.ifBlank { device?.thumbnailPath ?: "" }
                         )
                     }
                 }
@@ -104,10 +104,8 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(Unit) {
                             if (!didWarmLogin) {
                                 didWarmLogin = true
-                                isRefreshing = true
                                 val thumbDir = File(filesDir, "thumbnails")
-                                refreshAllDevices(db, thumbDir)
-                                isRefreshing = false
+                                runListRefresh(db, thumbDir) { refreshing -> isRefreshing = refreshing }
                             }
                         }
                         DeviceListScreen(
@@ -115,11 +113,11 @@ class MainActivity : ComponentActivity() {
                             isRefreshing = isRefreshing,
                             selectedNav = selectedNav,
                             onRefresh = {
+                                isRefreshing = true
                                 scope.launch {
-                                    isRefreshing = true
-                                    val thumbDir = File(filesDir, "thumbnails")
-                                    refreshAllDevices(db, thumbDir)
-                                    isRefreshing = false
+                                    runListRefresh(db, File(filesDir, "thumbnails")) { refreshing ->
+                                        isRefreshing = refreshing
+                                    }
                                 }
                             },
                             onAddDevice = { screen = Screen.AddDevice },
@@ -149,6 +147,9 @@ class MainActivity : ComponentActivity() {
                                         if (entity != null) {
                                             AlarmMonitor.stopListening(entity.ip)
                                             NetSDKManager.logoutByIp(entity.ip, entity.port)
+                                            AlarmMonitor.deleteImageFiles(
+                                                db.alarmDao().getImagePathsByDevice(entity.id)
+                                            )
                                         }
                                         db.deviceDao().deleteById(device.id.toLong())
                                     }
@@ -207,6 +208,9 @@ class MainActivity : ComponentActivity() {
                                         scope.launch {
                                             withContext(Dispatchers.IO) {
                                                 if (ids.isNotEmpty()) {
+                                                    AlarmMonitor.deleteImageFiles(
+                                                        db.alarmDao().getByIds(ids).map { it.imagePath }
+                                                    )
                                                     db.alarmDao().deleteByIds(ids)
                                                 }
                                             }
@@ -480,22 +484,57 @@ private suspend fun saveDeviceByIp(
     }
 }
 
-private suspend fun refreshAllDevices(db: AppDatabase, thumbDir: File) {
+/**
+ * Always clears the PTR spinner, even if native HTTP/JNI never returns.
+ * Status work runs on a sibling job; joining it with a timeout is cancellable.
+ */
+private suspend fun CoroutineScope.runListRefresh(
+    db: AppDatabase,
+    thumbDir: File,
+    setRefreshing: (Boolean) -> Unit
+) {
+    setRefreshing(true)
+    val statusJob = launch(Dispatchers.IO) { refreshAllDevices(db) }
+    try {
+        withTimeoutOrNull(12_000) { statusJob.join() }
+    } finally {
+        setRefreshing(false)
+    }
+    launch(Dispatchers.IO) { refreshAllThumbs(db, thumbDir) }
+}
+
+private suspend fun refreshAllDevices(db: AppDatabase) {
     withContext(Dispatchers.IO) {
-        if (!thumbDir.exists()) thumbDir.mkdirs()
         val allDevices = db.deviceDao().getAllOnce()
         if (allDevices.isEmpty()) return@withContext
 
-        // Parallel ensure-login / info / capture; sessions stay open until app exit.
-        coroutineScope {
-            allDevices.map { entity ->
-                async { refreshOneDevice(db, thumbDir, entity) }
-            }.awaitAll()
+        for (entity in allDevices) {
+            try {
+                refreshOneDevice(db, entity)
+            } catch (_: Exception) {
+                db.deviceDao().updateStatus(entity.id, DeviceEntity.STATUS_OFFLINE)
+            }
         }
     }
 }
 
-private suspend fun refreshOneDevice(db: AppDatabase, thumbDir: File, entity: DeviceEntity) {
+private suspend fun refreshAllThumbs(db: AppDatabase, thumbDir: File) {
+    withContext(Dispatchers.IO) {
+        if (!thumbDir.exists()) thumbDir.mkdirs()
+        for (entity in db.deviceDao().getAllOnce()) {
+            val handle = NetSDKManager.findHandle(entity.ip, entity.port) ?: continue
+            val thumbPath = captureThumb(thumbDir, entity.ip, handle)
+            if (thumbPath.isNotBlank() && thumbPath != entity.thumbnailPath) {
+                db.deviceDao().update(entity.copy(
+                    thumbnailPath = thumbPath,
+                    updatedAt = System.currentTimeMillis()
+                ))
+            }
+        }
+    }
+}
+
+private suspend fun refreshOneDevice(db: AppDatabase, entity: DeviceEntity) {
     var handle = NetSDKManager.ensureLogin(
         entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
     ).data
@@ -507,7 +546,6 @@ private suspend fun refreshOneDevice(db: AppDatabase, thumbDir: File, entity: De
 
     var info = NetSDKManager.getDeviceInfo(handle)
     if (!info.isSuccess) {
-        // Stale session: reconnect once, keep logged in afterward.
         NetSDKManager.logout(handle)
         handle = NetSDKManager.login(
             entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
@@ -530,26 +568,36 @@ private suspend fun refreshOneDevice(db: AppDatabase, thumbDir: File, entity: De
         sn = d.optString("serial_no").ifBlank { entity.serialNo }
         fw = d.optString("firmware_version").ifBlank { entity.firmwareVersion }
     }
-            val thumbPath = captureThumb(thumbDir, entity.ip, handle).ifBlank { entity.thumbnailPath }
-            db.deviceDao().update(
-                entity.copy(
-                    name = name,
-                    model = model,
-                    serialNo = sn,
-                    firmwareVersion = fw,
-                    status = DeviceEntity.STATUS_ONLINE,
-                    thumbnailPath = thumbPath,
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
-            // Keep RTP alarm listener for this device while app is alive.
-            AlarmMonitor.ensureListening(entity)
-        }
 
-private suspend fun captureThumb(thumbDir: File, ip: String, handle: Long = NetSDKManager.getActiveHandle()): String {
-    val file = File(thumbDir, "thumb_${ip.replace('.', '_')}.jpg")
-    val r = NetSDKManager.getThermalCapture(0, file.absolutePath, handle)
-    return if (r.isSuccess) file.absolutePath else ""
+    // Mark online before capture so a hung snapshot cannot leave the spinner forever.
+    db.deviceDao().update(
+        entity.copy(
+            name = name,
+            model = model,
+            serialNo = sn,
+            firmwareVersion = fw,
+            status = DeviceEntity.STATUS_ONLINE,
+            thumbnailPath = entity.thumbnailPath,
+            updatedAt = System.currentTimeMillis()
+        )
+    )
+    AlarmMonitor.ensureListening(entity)
+}
+
+private suspend fun captureThumb(
+    thumbDir: File,
+    ip: String,
+    handle: Long = NetSDKManager.getActiveHandle()
+): String {
+    return try {
+        withTimeout(6_000) {
+            val file = File(thumbDir, "thumb_${ip.replace('.', '_')}.jpg")
+            val r = NetSDKManager.getThermalCapture(0, file.absolutePath, handle)
+            if (r.isSuccess) file.absolutePath else ""
+        }
+    } catch (_: Exception) {
+        ""
+    }
 }
 
 private sealed class Screen {

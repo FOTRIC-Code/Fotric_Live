@@ -3,4 +3,5 @@
     <files-path name="captures" path="captures/" />
     <files-path name="records" path="records/" />
     <files-path name="thumbnails" path="thumbnails/" />
+    <files-path name="alarms" path="alarms/" />
 </paths>

@@ -28,6 +28,15 @@ interface AlarmDao {
     @Insert
     suspend fun insert(alarm: AlarmMessage): Long
 
+    @Query("UPDATE alarm_messages SET imagePath = :path WHERE id = :id")
+    suspend fun updateImagePath(id: Long, path: String)
+
+    @Query("SELECT * FROM alarm_messages WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<AlarmMessage>
+
+    @Query("SELECT imagePath FROM alarm_messages WHERE deviceId = :deviceId AND imagePath != ''")
+    suspend fun getImagePathsByDevice(deviceId: Long): List<String>
+
     @Query("UPDATE alarm_messages SET isRead = 1 WHERE id = :id")
     suspend fun markRead(id: Long)
 

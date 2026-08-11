@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -29,6 +30,7 @@ object AlarmMonitor {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
+    private val captureMutex = Mutex()
     private val listeners = ConcurrentHashMap<String, Long>() // ip -> sessionId
 
     @Volatile
@@ -210,9 +212,62 @@ object AlarmMonitor {
                 )
             }
             database.deviceDao().updateStatus(device.id, DeviceEntity.STATUS_ALARM)
-            Log.i(TAG, "alarm saved from $ip: $title")
+            val imagePath = captureAlarmImage(device, insertedId, timestamp)
+            if (imagePath.isNotBlank()) {
+                database.alarmDao().updateImagePath(insertedId, imagePath)
+            }
+            Log.i(TAG, "alarm saved from $ip: $title image=$imagePath")
         } catch (e: Exception) {
             Log.e(TAG, "handleAlarm failed ip=$ip", e)
+        }
+    }
+
+    private suspend fun captureAlarmImage(
+        device: DeviceEntity,
+        alarmId: Long,
+        timestamp: Long
+    ): String {
+        val ctx = appContext ?: return ""
+        val dir = File(ctx.filesDir, "alarms")
+        if (!dir.exists() && !dir.mkdirs()) {
+            Log.w(TAG, "captureAlarmImage: cannot create $dir")
+            return ""
+        }
+        val ipSafe = device.ip.replace('.', '_')
+        val file = File(dir, "alarm_${ipSafe}_${timestamp}_${alarmId}.jpg")
+        return captureMutex.withLock {
+            try {
+                val handle = NetSDKManager.findHandle(device.ip, device.port)
+                    ?: NetSDKManager.ensureLogin(
+                        device.ip,
+                        device.port,
+                        device.userName,
+                        device.password.ifBlank { "admin" }
+                    ).data
+                if (handle == null || handle == 0L) {
+                    Log.w(TAG, "captureAlarmImage: no session for ${device.ip}")
+                    return@withLock ""
+                }
+                val result = NetSDKManager.getThermalCapture(0, file.absolutePath, handle)
+                if (result.isSuccess && file.exists() && file.length() > 0L) {
+                    file.absolutePath
+                } else {
+                    Log.w(TAG, "captureAlarmImage failed: ${device.ip} ${result.message}")
+                    if (file.exists()) file.delete()
+                    ""
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "captureAlarmImage exception ip=${device.ip}", e)
+                if (file.exists()) file.delete()
+                ""
+            }
+        }
+    }
+
+    fun deleteImageFiles(paths: Collection<String>) {
+        paths.forEach { path ->
+            if (path.isBlank()) return@forEach
+            runCatching { File(path).delete() }
         }
     }
 

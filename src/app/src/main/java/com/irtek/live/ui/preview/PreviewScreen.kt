@@ -263,7 +263,7 @@ fun PreviewScreen(
 
             RecentAlarmsCard(
                 alarms = alarms,
-                thumbnailPath = device.thumbnailPath,
+                fallbackThumb = device.thumbnailPath,
                 onAlarmClick = { alarm ->
                     onMarkAlarmRead(alarm.id)
                     detailAlarm = alarm
@@ -280,7 +280,7 @@ fun PreviewScreen(
                 item = MessageItem(
                     alarm = alarm,
                     deviceName = device.name,
-                    thumbnailPath = device.thumbnailPath
+                    thumbnailPath = alarm.imagePath.ifBlank { device.thumbnailPath }
                 ),
                 onBack = { detailAlarm = null }
             )
@@ -656,7 +656,7 @@ private fun ActionButton(
 @Composable
 private fun RecentAlarmsCard(
     alarms: List<AlarmMessage>,
-    thumbnailPath: String,
+    fallbackThumb: String,
     onAlarmClick: (AlarmMessage) -> Unit
 ) {
     Card(
@@ -699,7 +699,7 @@ private fun RecentAlarmsCard(
                     }
                     AlarmItem(
                         alarm = alarm,
-                        thumbnailPath = thumbnailPath,
+                        thumbnailPath = alarm.imagePath.ifBlank { fallbackThumb },
                         onClick = { onAlarmClick(alarm) }
                     )
                 }
