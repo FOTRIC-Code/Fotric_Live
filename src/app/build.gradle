@@ -18,6 +18,12 @@ if (versionParts.size() >= 4) {
     projectVersionCode = versionParts[0].toInteger() * 10000 + versionParts[1].toInteger() * 100 + versionParts[2].toInteger()
 }
 
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace 'com.irtek.live'
     compileSdk 36
@@ -30,10 +36,29 @@ android {
         versionName projectBuildVersion
     }
 
+    signingConfigs {
+        release {
+            def store = keystoreProps['storeFile'] ?: System.getenv('LIVE_STORE_FILE')
+            def storePw = keystoreProps['storePassword'] ?: System.getenv('LIVE_STORE_PASSWORD')
+            def alias = keystoreProps['keyAlias'] ?: System.getenv('LIVE_KEY_ALIAS')
+            def keyPw = keystoreProps['keyPassword'] ?: System.getenv('LIVE_KEY_PASSWORD')
+            if (store) {
+                storeFile rootProject.file(store)
+                storePassword storePw
+                keyAlias alias
+                keyPassword keyPw
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Installable APK: use release keystore when configured, otherwise debug cert.
+            def hasReleaseKey = signingConfigs.release.storeFile != null &&
+                    signingConfigs.release.storeFile.exists()
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
         }
     }
     compileOptions {
