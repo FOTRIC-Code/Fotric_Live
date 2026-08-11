@@ -9,7 +9,7 @@ import jetbrains.buildServer.configs.kotlin.v2019_2.triggers.vcs
  * Fotric.Live Android CI (TeamCity Kotlin DSL 2019.2)
  *
  * Prerequisites on build agent:
- * - JDK 11 x64
+ * - JDK 17 or 21 x64 (AGP 8.13; Java 11 will fail immediately)
  * - Android SDK (ANDROID_SDK_ROOT; ANDROID_HOME optional, same path)
  *
  * IRtekNetSDK is consumed as a prebuilt AAR from src/repo (no NDK / no SDK source checkout).
@@ -51,7 +51,11 @@ object FotricLive : BuildType({
             workingDir = "src"
             useGradleWrapper = true
             enableStacktrace = true
-            gradleParams = "--no-daemon -Dorg.gradle.jvmargs=-Xmx4g"
+            // Additional Gradle params (NOT the same as JVM params).
+            gradleParams = "--no-daemon --no-watch-fs"
+            // TeamCity UI: "JVM command line parameters" must be:
+            //   -Xmx4g -Dorg.gradle.native=false
+            // That field becomes the daemon jvmargs. Putting native=false only in gradleParams does nothing.
         }
     }
 
