@@ -22,8 +22,10 @@
 - Run: **If all previous steps finished successfully**
 - Script:
 
+用 `%teamcity.build.checkoutDir%`（仓库根），不要用 `workingDir`。SDK 其它步骤的工作目录经常是 `builder`，再拼一层会变成 `builder\builder\...`。
+
 ```bat
-powershell -ExecutionPolicy Bypass -File "%teamcity.build.workingDir%\builder\push_aar_to_live.ps1" -MavenDir "%teamcity.build.workingDir%\output\library\maven" -Version "%Project_Build_Version%" -LiveGitUrl "%LIVE_GIT_URL%" -LiveBranch "%LIVE_GIT_BRANCH%" -GitUser "%LIVE_GIT_USER%"
+powershell -ExecutionPolicy Bypass -File "%teamcity.build.checkoutDir%\builder\push_aar_to_live.ps1" -MavenDir "%teamcity.build.checkoutDir%\output\library\maven" -Version "%Project_Build_Version%" -LiveGitUrl "%LIVE_GIT_URL%" -LiveBranch "%LIVE_GIT_BRANCH%" -GitUser "%LIVE_GIT_USER%"
 ```
 
 密码走环境变量 `LIVE_GIT_PASSWORD`。
