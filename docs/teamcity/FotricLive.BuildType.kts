@@ -45,8 +45,8 @@ object FotricLive : BuildType({
         }
 
         gradle {
-            name = "Assemble Debug APK"
-            tasks = "clean :app:assembleDebug"
+            name = "Assemble Release APK"
+            tasks = "clean :app:assembleRelease"
             buildFile = "build.gradle"
             workingDir = "src"
             useGradleWrapper = true
@@ -56,7 +56,6 @@ object FotricLive : BuildType({
     }
 
     artifactRules = """
-        src/app/build/outputs/apk/debug/*.apk => apk/debug
         src/app/build/outputs/apk/release/*.apk => apk/release
     """.trimIndent()
 })

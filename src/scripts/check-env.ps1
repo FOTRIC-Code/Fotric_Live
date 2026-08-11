@@ -1,7 +1,12 @@
 $ErrorActionPreference = 'Stop'
 
+if (Test-Path 'src\gradlew.bat') {
+    Set-Location 'src'
+}
+
 Write-Host "==== Java ===="
 java -version
+Write-Host "PWD=$pwd"
 
 $sdkDir = $env:ANDROID_SDK_ROOT
 if (-not $sdkDir) { $sdkDir = $env:ANDROID_HOME }
@@ -11,11 +16,11 @@ if (-not $sdkDir) {
     throw "Set ANDROID_SDK_ROOT on the agent (typical: $env:LOCALAPPDATA\Android\Sdk)"
 }
 if (-not (Test-Path (Join-Path $sdkDir 'platform-tools'))) {
-    throw "Android SDK not found at $sdkDir (need platform-tools). Do not point this at SensorData."
+    throw "Android SDK not found at $sdkDir (need platform-tools)"
 }
 
 if (-not (Test-Path 'gradlew.bat')) {
-    throw "gradlew.bat not found. TeamCity working directory must be src"
+    throw "gradlew.bat not found (looked in checkout root and src)"
 }
 
 $verLine = Select-String -Path 'gradle.properties' -Pattern '^IRTEK_NETSDK_VERSION=(.+)$' | Select-Object -First 1
