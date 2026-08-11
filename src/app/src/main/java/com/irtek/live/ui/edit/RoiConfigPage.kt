@@ -93,6 +93,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.ByteBuffer
 
+/** Matches net_enum_marker_type in IRtekNetSDK.h (no type=2). */
+private const val MARKER_SPOT = 1
+private const val MARKER_RECTANGLE = 3
+private const val MARKER_ELLIPSE = 4
+private const val MARKER_POLYGON = 5
+private const val MARKER_POLYLINE = 6
+
 /** Client-side thermal marker model (Demo DrawMarker + preserved params). */
 private data class DrawMarker(
     var id: Int = 0,
@@ -165,7 +172,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
                 spotCounter++
                 val m = DrawMarker(
                     id = nextMarkerId++,
-                    type = 1,
+                    type = MARKER_SPOT,
                     name = "S%02d".format(spotCounter),
                     points = mutableListOf(mx to my)
                 )
@@ -178,7 +185,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
                 lineCounter++
                 val m = DrawMarker(
                     id = nextMarkerId++,
-                    type = 2,
+                    type = MARKER_POLYLINE,
                     name = "L%02d".format(lineCounter),
                     points = mutableListOf(
                         mx to my,
@@ -199,7 +206,7 @@ fun RoiConfigPage(onBack: () -> Unit) {
                 val y1 = (my + 30).coerceAtMost(markerResH - 1)
                 val m = DrawMarker(
                     id = nextMarkerId++,
-                    type = 5,
+                    type = MARKER_POLYGON,
                     name = "A%02d".format(areaCounter),
                     points = mutableListOf(x0 to y0, x1 to y0, x1 to y1, x0 to y1)
                 )
