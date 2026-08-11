@@ -3,7 +3,7 @@
   "component": {
     "group": "com.irtek",
     "module": "netsdk",
-    "version": "1.0.1.63",
+    "version": "1.0.1.64",
     "attributes": {
       "org.gradle.status": "release"
     }
@@ -33,13 +33,13 @@
       ],
       "files": [
         {
-          "name": "netsdk-1.0.1.63.aar",
-          "url": "netsdk-1.0.1.63.aar",
-          "size": 3294564,
-          "sha512": "9976eb2fea9503cc20140be99a6191d9425343e32e627468f61eeb8441ad0e09260f3eaedb254ec3dc853dc8b8a8e6702579ba8d289f82407098aa59ff031373",
-          "sha256": "e3b73131c57ad30eb54c8d2ebbcb7716607b0cd06bb8fc04a450da197509df96",
-          "sha1": "743fa01711ad4bb9a3b1e824a0b8cda0698af747",
-          "md5": "18e4d7830afae0a7c9fe743a3a48b72f"
+          "name": "netsdk-1.0.1.64.aar",
+          "url": "netsdk-1.0.1.64.aar",
+          "size": 3294679,
+          "sha512": "c65502df38b0ac17577fe51c3ff53ee7017a51b5452805c7618c5ea00e4d98ce8ba4d3514608d30136ff8a7068b4e480bd6c6220283fc45aaff362895db59756",
+          "sha256": "a4eb91ec8c2e39ecfbd7c40b9b71c70e879876b3fabba99f897194fb0c438e05",
+          "sha1": "ec9d3c5dc3826672c48c1d60cdd105ffd532269b",
+          "md5": "1fe07ad882d7dc327eadf156a030a07f"
         }
       ]
     },
@@ -76,13 +76,13 @@
       ],
       "files": [
         {
-          "name": "netsdk-1.0.1.63.aar",
-          "url": "netsdk-1.0.1.63.aar",
-          "size": 3294564,
-          "sha512": "9976eb2fea9503cc20140be99a6191d9425343e32e627468f61eeb8441ad0e09260f3eaedb254ec3dc853dc8b8a8e6702579ba8d289f82407098aa59ff031373",
-          "sha256": "e3b73131c57ad30eb54c8d2ebbcb7716607b0cd06bb8fc04a450da197509df96",
-          "sha1": "743fa01711ad4bb9a3b1e824a0b8cda0698af747",
-          "md5": "18e4d7830afae0a7c9fe743a3a48b72f"
+          "name": "netsdk-1.0.1.64.aar",
+          "url": "netsdk-1.0.1.64.aar",
+          "size": 3294679,
+          "sha512": "c65502df38b0ac17577fe51c3ff53ee7017a51b5452805c7618c5ea00e4d98ce8ba4d3514608d30136ff8a7068b4e480bd6c6220283fc45aaff362895db59756",
+          "sha256": "a4eb91ec8c2e39ecfbd7c40b9b71c70e879876b3fabba99f897194fb0c438e05",
+          "sha1": "ec9d3c5dc3826672c48c1d60cdd105ffd532269b",
+          "md5": "1fe07ad882d7dc327eadf156a030a07f"
         }
       ]
     }
