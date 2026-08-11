@@ -5,6 +5,19 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+def rawBuildVersion = findProperty('Project_Build_Version')?.toString()?.trim()
+def projectBuildVersion = (rawBuildVersion && rawBuildVersion ==~ /^\d+(\.\d+)+$/ && !rawBuildVersion.contains('%'))
+        ? rawBuildVersion
+        : '1.0.0'
+def versionParts = projectBuildVersion.tokenize('.')
+def projectVersionCode = 1
+if (versionParts.size() >= 4) {
+    projectVersionCode = versionParts[0].toInteger() * 1000000 + versionParts[1].toInteger() * 10000 +
+            versionParts[2].toInteger() * 100 + versionParts[3].toInteger()
+} else if (versionParts.size() == 3) {
+    projectVersionCode = versionParts[0].toInteger() * 10000 + versionParts[1].toInteger() * 100 + versionParts[2].toInteger()
+}
+
 android {
     namespace 'com.irtek.live'
     compileSdk 36
@@ -13,8 +26,8 @@ android {
         applicationId "com.irtek.live"
         minSdk 24
         targetSdk 36
-        versionCode 1
-        versionName "1.0.0"
+        versionCode projectVersionCode
+        versionName projectBuildVersion
     }
 
     buildTypes {

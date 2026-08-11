@@ -52,7 +52,7 @@ object FotricLive : BuildType({
             useGradleWrapper = true
             enableStacktrace = true
             // Additional Gradle params (NOT the same as JVM params).
-            gradleParams = "--no-daemon --no-watch-fs"
+            gradleParams = "--no-daemon --no-watch-fs -PProject_Build_Version=%Project_Build_Version%"
             // TeamCity UI: "JVM command line parameters" must be:
             //   -Xmx4g -Dorg.gradle.native=false
             // That field becomes the daemon jvmargs. Putting native=false only in gradleParams does nothing.
