@@ -40,6 +40,12 @@ android {
     }
 }
 
+android.applicationVariants.configureEach { variant ->
+    variant.outputs.configureEach { output ->
+        output.outputFileName = "FotricLive-${variant.versionName}-${variant.name}.apk"
+    }
+}
+
 dependencies {
     implementation "com.irtek:netsdk:${findProperty('IRTEK_NETSDK_VERSION')}"
 

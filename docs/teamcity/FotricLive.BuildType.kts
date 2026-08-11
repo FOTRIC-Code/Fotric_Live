@@ -26,12 +26,12 @@ object FotricLive : BuildType({
     vcs {
         root(Http19216810253000IRtekLiveAndroidGit)
         cleanCheckout = true
-        branchFilter = "+:dev"
+        branchFilter = "+:master"
     }
 
     triggers {
         vcs {
-            branchFilter = "+:dev"
+            branchFilter = "+:master"
         }
     }
 
