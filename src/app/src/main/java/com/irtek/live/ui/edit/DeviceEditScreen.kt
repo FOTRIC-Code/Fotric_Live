@@ -402,6 +402,7 @@ private fun NetworkConfigPage(onBack: () -> Unit) {
     var isLoading by remember { mutableStateOf(true) }
 
     var networkId by remember { mutableIntStateOf(0) }
+    var networkName by remember { mutableStateOf("") }
     var dhcp by remember { mutableIntStateOf(0) }
     var ip by remember { mutableStateOf("") }
     var netmask by remember { mutableStateOf("") }
@@ -409,6 +410,7 @@ private fun NetworkConfigPage(onBack: () -> Unit) {
     var dns by remember { mutableStateOf("") }
     var httpPort by remember { mutableStateOf("") }
     var rtspPort by remember { mutableStateOf("") }
+    var rtpPort by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -416,6 +418,7 @@ private fun NetworkConfigPage(onBack: () -> Unit) {
             if (nr.isSuccess && nr.data != null && nr.data!!.length() > 0) {
                 val n = nr.data!!.getJSONObject(0)
                 networkId = n.optInt("id", 0)
+                networkName = n.optString("name")
                 dhcp = n.optInt("dhcp", 0)
                 ip = n.optString("ip")
                 netmask = n.optString("netmask")
@@ -428,6 +431,7 @@ private fun NetworkConfigPage(onBack: () -> Unit) {
             if (pr.isSuccess && pr.data != null) {
                 httpPort = pr.data!!.optInt("http_port_no", 80).toString()
                 rtspPort = pr.data!!.optInt("rtsp_port_no", 554).toString()
+                rtpPort = pr.data!!.optInt("rtp_port_no", 5004).toString()
             }
         }
         isLoading = false
@@ -464,24 +468,31 @@ private fun NetworkConfigPage(onBack: () -> Unit) {
             scope.launch {
                 val netJson = JSONObject().apply {
                     put("id", networkId)
+                    put("name", networkName)
                     put("dhcp", dhcp)
-                    put("ip", ip)
-                    put("netmask", netmask)
-                    put("gateway", JSONArray().apply { if (gateway.isNotBlank()) put(gateway) })
-                    put("dns", JSONArray().apply { if (dns.isNotBlank()) put(dns) })
+                    put("ip", ip.trim())
+                    put("netmask", netmask.trim())
+                    put("gateway", JSONArray().apply { if (gateway.isNotBlank()) put(gateway.trim()) })
+                    put("dns", JSONArray().apply { if (dns.isNotBlank()) put(dns.trim()) })
                 }
                 val nr = NetSDKManager.setNetwork(networkId, netJson.toString())
                 val portJson = JSONObject().apply {
                     put("http_port_no", httpPort.toIntOrNull() ?: 80)
                     put("rtsp_port_no", rtspPort.toIntOrNull() ?: 554)
+                    put("rtp_port_no", rtpPort.toIntOrNull() ?: 5004)
                 }
                 val pr = NetSDKManager.setPort(portJson.toString())
                 val ok = nr.isSuccess && pr.isSuccess
-                Toast.makeText(
-                    context,
-                    if (ok) context.getString(R.string.common_save_success) else context.getString(R.string.common_save_failed),
-                    Toast.LENGTH_SHORT
-                ).show()
+                val msg = if (ok) {
+                    context.getString(R.string.common_save_success)
+                } else {
+                    val detail = buildList {
+                        if (!nr.isSuccess) add("网络 ${nr.message}")
+                        if (!pr.isSuccess) add("端口 ${pr.message}")
+                    }.joinToString("; ")
+                    context.getString(R.string.common_save_failed_fmt, detail)
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 if (ok) onBack()
             }
         }
