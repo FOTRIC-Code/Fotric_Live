@@ -3,11 +3,11 @@
   <groupId>com.irtek</groupId>
   <artifactId>netsdk</artifactId>
   <versioning>
-    <latest>1.0.1.64</latest>
-    <release>1.0.1.64</release>
+    <latest>1.0.1.65</latest>
+    <release>1.0.1.65</release>
     <versions>
-      <version>1.0.1.64</version>
+      <version>1.0.1.65</version>
     </versions>
-    <lastUpdated>20260811075243</lastUpdated>
+    <lastUpdated>20260813053441</lastUpdated>
   </versioning>
 </metadata>
