@@ -36,7 +36,6 @@ import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlinx.coroutines.CoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +44,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,7 +62,9 @@ import com.irtek.netsdk.NativeSDK
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.File
@@ -68,12 +72,17 @@ import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 data class PreviewDevice(
     val id: Long,
     val name: String,
     val ip: String,
-    val thumbnailPath: String
+    val thumbnailPath: String,
+    val port: Int = 80,
+    val userName: String = "admin",
+    val password: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,14 +113,66 @@ fun PreviewScreen(
     var detailAlarm by remember { mutableStateOf<AlarmMessage?>(null) }
 
     val sdf = remember { java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val streamLock = remember { Mutex() }
+    val previewActive = remember { AtomicBoolean(true) }
+    val lastFrameAt = remember { AtomicLong(0L) }
+    val latestDevice = rememberUpdatedState(device)
+    val latestRecording = rememberUpdatedState(isRecording)
 
-    DisposableEffect(Unit) {
+    suspend fun ensureStreaming() {
+        val dev = latestDevice.value
+        if (!previewActive.get()) return
+        if (!streamLock.tryLock()) return
+        try {
+            withContext(Dispatchers.IO) {
+                if (!previewActive.get()) return@withContext
+                val login = NetSDKManager.ensureLogin(
+                    dev.ip, dev.port, dev.userName, dev.password.ifBlank { "admin" }
+                )
+                val handle = login.data
+                if (!login.isSuccess || handle == null || handle == 0L) return@withContext
+                runCatching { NativeSDK.nativeSetEventCallback(handle, true) }
+                runCatching { NetSDKManager.stopStream(handle) }
+                if (!previewActive.get()) return@withContext
+                var retries = 0
+                while (retries < 15 && previewActive.get()) {
+                    val streams = NetSDKManager.getStreams(handle)
+                    if (streams.isSuccess && streams.data != null && streams.data!!.length() > 0) {
+                        val firstStream = streams.data!!.getJSONObject(0)
+                        activeStreamId = firstStream.optInt("id", 101)
+                        val w = firstStream.optInt("resolution_width", 0)
+                        val h = firstStream.optInt("resolution_height", 0)
+                        if (w > 0 && h > 0) {
+                            videoAspectRatio = w.toFloat() / h.toFloat()
+                        }
+                        val started = NetSDKManager.startStream(activeStreamId, 2, handle)
+                        if (started.isSuccess) {
+                            lastFrameAt.set(System.currentTimeMillis())
+                        }
+                        break
+                    }
+                    delay(200)
+                    retries++
+                }
+                if (!previewActive.get()) {
+                    runCatching { NetSDKManager.stopStream(handle) }
+                }
+            }
+        } finally {
+            streamLock.unlock()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, device.ip) {
+        previewActive.set(true)
         NetSDKManager.setStreamFrameListener(object : NativeSDK.StreamFrameListener {
             override fun onStreamFrame(
                 handle: Long, streamId: Int, streamType: Int,
                 width: Int, height: Int, data: ByteArray,
                 timestampUs: Long, keyFrame: Boolean
             ) {
+                lastFrameAt.set(System.currentTimeMillis())
                 if (width <= 0 || height <= 0 || data.isEmpty()) return
                 try {
                     val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -121,33 +182,53 @@ fun PreviewScreen(
                 } catch (_: Exception) {}
             }
         })
-
+        NetSDKManager.setEventListener(object : NativeSDK.EventListener {
+            override fun onEvent(handle: Long, eventType: Int, streamId: Int, message: String) {
+                if (latestRecording.value) return
+                if (eventType == 2 || eventType == 3) {
+                    scope.launch { ensureStreaming() }
+                }
+            }
+        })
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    previewActive.set(true)
+                    scope.launch { ensureStreaming() }
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    previewActive.set(false)
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { NetSDKManager.stopStream() }
+                    }
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            scope.launch { ensureStreaming() }
+        }
         onDispose {
+            previewActive.set(false)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            NetSDKManager.setEventListener(null)
             NetSDKManager.setStreamFrameListener(null)
+            scope.launch(Dispatchers.IO) {
+                runCatching { NetSDKManager.stopStream() }
+            }
         }
     }
 
     LaunchedEffect(Unit) {
         if (!captureDir.exists()) captureDir.mkdirs()
         if (!recordDir.exists()) recordDir.mkdirs()
-        // Wait for login to complete (it runs concurrently from MainActivity)
-        withContext(Dispatchers.IO) {
-            var retries = 0
-            while (retries < 30) {
-                val streams = NetSDKManager.getStreams()
-                if (streams.isSuccess && streams.data != null && streams.data!!.length() > 0) {
-                    val firstStream = streams.data!!.getJSONObject(0)
-                    activeStreamId = firstStream.optInt("id", 101)
-                    val w = firstStream.optInt("resolution_width", 0)
-                    val h = firstStream.optInt("resolution_height", 0)
-                    if (w > 0 && h > 0) {
-                        videoAspectRatio = w.toFloat() / h.toFloat()
-                    }
-                    NetSDKManager.startStream(activeStreamId, 2)
-                    break
-                }
-                delay(200)
-                retries++
+        while (isActive) {
+            delay(3_000)
+            if (!previewActive.get() || latestRecording.value) continue
+            val last = lastFrameAt.get()
+            if (last == 0L || System.currentTimeMillis() - last > 8_000) {
+                ensureStreaming()
             }
         }
     }

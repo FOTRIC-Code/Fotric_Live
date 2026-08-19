@@ -535,8 +535,9 @@ private fun DetailRow(label: String, value: String) {
             label,
             fontSize = 14.sp,
             color = AppColors.TextSecondary,
-            modifier = Modifier.width(88.dp)
+            modifier = Modifier.width(120.dp)
         )
+        Spacer(Modifier.width(12.dp))
         Text(
             value,
             fontSize = 14.sp,

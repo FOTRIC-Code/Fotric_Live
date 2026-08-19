@@ -305,11 +305,15 @@ class MainActivity : ComponentActivity() {
                             screen = Screen.DeviceList
                         }
                         BackHandler { leavePreview() }
+                        val entity = deviceEntities.find { it.id == s.deviceId }
                         val previewDevice = PreviewDevice(
                             id = s.deviceId,
                             name = s.name,
                             ip = s.ip,
-                            thumbnailPath = s.thumbnailPath
+                            thumbnailPath = s.thumbnailPath,
+                            port = entity?.port ?: 80,
+                            userName = entity?.userName ?: "admin",
+                            password = entity?.password ?: ""
                         )
                         val recentAlarms by db.alarmDao()
                             .getRecentByDevice(s.deviceId, 3)
