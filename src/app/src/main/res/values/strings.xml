@@ -24,6 +24,7 @@
     <string name="common_operation_failed">操作失败</string>
     <string name="common_not_supported">暂不支持</string>
     <string name="common_seconds">秒</string>
+    <string name="common_minutes">分钟</string>
     <string name="common_selected_count">已选 %1$d</string>
     <string name="common_warm_tip">温馨提醒</string>
     <string name="common_unknown_device">未知设备</string>
@@ -107,7 +108,9 @@
     <string name="add_hint_user">例如：admin</string>
     <string name="add_hint_password">请输入密码</string>
     <string name="add_error_ip_required">请输入 IP 地址</string>
+    <string name="add_error_already_added">该设备已添加，请勿重复添加</string>
     <string name="add_error_connect_failed">连接失败：%1$s</string>
+    <string name="add_already_added">已添加</string>
     <string name="add_searching">正在搜索局域网设备…</string>
     <string name="add_search_done">搜索完成，发现 %1$d 台设备</string>
     <string name="add_search_results">搜索结果</string>
@@ -159,6 +162,7 @@
 
     <!-- Alarm config -->
     <string name="alarm_config_title">报警配置</string>
+    <string name="alarm_interval">报警时间间隔</string>
     <string name="alarm_linkage">报警联动</string>
     <string name="alarm_ftp">FTP 上传</string>
     <string name="alarm_webhook">Webhook 推送</string>
@@ -167,11 +171,11 @@
     <string name="alarm_switch">报警开关</string>
     <string name="alarm_type">报警类型</string>
     <string name="alarm_temp">报警温度</string>
-    <string name="alarm_delay">报警延时</string>
-    <string name="alarm_warning_temp">二级预警温度</string>
-    <string name="alarm_warning_delay">二级预警延时</string>
-    <string name="alarm_alert_temp">一级预警温度</string>
-    <string name="alarm_alert_delay">一级预警延时</string>
+    <string name="alarm_delay">报警温度延时</string>
+    <string name="alarm_warning_temp">预警温度</string>
+    <string name="alarm_warning_delay">预警温度延时</string>
+    <string name="alarm_alert_temp">提醒</string>
+    <string name="alarm_alert_delay">提醒温度延时</string>
     <string name="alarm_save_settings">保存设置</string>
     <string name="alarm_marker_fmt">标识%1$d</string>
     <string name="alarm_cond_high_gt">高温大于</string>

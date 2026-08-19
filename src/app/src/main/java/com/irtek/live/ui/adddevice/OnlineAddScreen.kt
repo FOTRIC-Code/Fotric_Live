@@ -31,12 +31,15 @@ import org.json.JSONObject
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnlineAddScreen(
+    addedIps: Set<String> = emptySet(),
+    addedSerials: Set<String> = emptySet(),
     onBack: () -> Unit,
     onDeviceAdd: (JSONObject) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var isSearching by remember { mutableStateOf(true) }
     var devices by remember { mutableStateOf<JSONArray?>(null) }
+    var pendingIps by remember { mutableStateOf(setOf<String>()) }
 
     fun doSearch() {
         isSearching = true
@@ -121,7 +124,17 @@ fun OnlineAddScreen(
                         val arr = devices!!
                         for (i in 0 until arr.length()) {
                             val device = arr.getJSONObject(i)
-                            DeviceResultRow(device) { onDeviceAdd(device) }
+                            val ip = device.optString("ip").trim()
+                            val already = isAlreadyAdded(device, addedIps, addedSerials) ||
+                                pendingIps.any { it.equals(ip, ignoreCase = true) }
+                            DeviceResultRow(
+                                device = device,
+                                alreadyAdded = already,
+                                onAdd = {
+                                    if (ip.isNotEmpty()) pendingIps = pendingIps + ip
+                                    onDeviceAdd(device)
+                                }
+                            )
                             if (i < arr.length() - 1) {
                                 HorizontalDivider(thickness = 0.5.dp, color = Color(0x0F1D2129))
                             }
@@ -137,8 +150,16 @@ fun OnlineAddScreen(
     }
 }
 
+private fun isAlreadyAdded(device: JSONObject, addedIps: Set<String>, addedSerials: Set<String>): Boolean {
+    val ip = device.optString("ip").trim()
+    val serial = device.optString("serial_no").trim()
+    if (ip.isNotEmpty() && addedIps.any { it.equals(ip, ignoreCase = true) }) return true
+    if (serial.isNotEmpty() && addedSerials.any { it.equals(serial, ignoreCase = true) }) return true
+    return false
+}
+
 @Composable
-private fun DeviceResultRow(device: JSONObject, onAdd: () -> Unit) {
+private fun DeviceResultRow(device: JSONObject, alreadyAdded: Boolean, onAdd: () -> Unit) {
     val ip = device.optString("ip")
     val name = device.optString("model").ifBlank { device.optString("name").ifBlank { ip } }
     val serialNo = device.optString("serial_no")
@@ -183,12 +204,17 @@ private fun DeviceResultRow(device: JSONObject, onAdd: () -> Unit) {
             modifier = Modifier
                 .height(26.dp)
                 .clip(CircleShape)
-                .background(Color(0x142673F9))
-                .clickable(onClick = onAdd)
+                .background(if (alreadyAdded) Color(0xFFF0F2F5) else Color(0x142673F9))
+                .then(if (alreadyAdded) Modifier else Modifier.clickable(onClick = onAdd))
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(stringResource(R.string.common_add), fontSize = 13.sp, color = Color(0xFF2673F9), fontWeight = FontWeight.Medium)
+            Text(
+                if (alreadyAdded) stringResource(R.string.add_already_added) else stringResource(R.string.common_add),
+                fontSize = 13.sp,
+                color = if (alreadyAdded) AppColors.TextSecondary else Color(0xFF2673F9),
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

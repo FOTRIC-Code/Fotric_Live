@@ -34,6 +34,7 @@ import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -62,8 +63,8 @@ fun AlarmConfigScreen(
     // Data from SDK
     var markers by remember { mutableStateOf<JSONArray?>(null) }
     var allAlarms by remember { mutableStateOf<JSONArray?>(null) }
-    var ftpEnabled by remember { mutableStateOf(false) }
-    var webhookEnabled by remember { mutableStateOf(false) }
+    var alarmInterval by remember { mutableStateOf("10") }
+    var savedInterval by remember { mutableStateOf("10") }
     var tempUnitSuffix by remember { mutableStateOf("℃") }
 
     // Internal navigation: null = list page, String = marker detail
@@ -79,12 +80,16 @@ fun AlarmConfigScreen(
             if (alarmsResult.isSuccess && alarmsResult.data != null) {
                 allAlarms = alarmsResult.data
             }
-            val triggerResult = NetSDKManager.getAlarmTrigger(1)
-            Log.d("AlarmConfig", "getAlarmTrigger result: success=${triggerResult.isSuccess}, code=${triggerResult.code}, msg=${triggerResult.message}, data=${triggerResult.data}")
-            if (triggerResult.isSuccess && triggerResult.data != null) {
-                ftpEnabled = triggerResult.data!!.optInt("trigger_ftp_enabled", 0) == 1
-                webhookEnabled = triggerResult.data!!.optInt("trigger_webhook_enabled", 0) == 1
-                Log.d("AlarmConfig", "Parsed: ftp=$ftpEnabled, webhook=$webhookEnabled")
+            val intervalResult = NetSDKManager.getThermalAlarmInterval()
+            Log.i(
+                "AlarmInterval",
+                "config get ok=${intervalResult.isSuccess} value=${intervalResult.data} " +
+                    "code=${intervalResult.code} msg=${intervalResult.message}"
+            )
+            if (intervalResult.isSuccess && intervalResult.data != null) {
+                val v = intervalResult.data!!.toString()
+                alarmInterval = v
+                savedInterval = v
             }
             val unitResult = NetSDKManager.getThermalUnit()
             if (unitResult.isSuccess && unitResult.data != null) {
@@ -108,6 +113,25 @@ fun AlarmConfigScreen(
         list
     }
 
+    suspend fun saveIntervalNow() {
+        val v = alarmInterval.toIntOrNull() ?: return
+        if (v.toString() == savedInterval) return
+        val r = withContext(Dispatchers.IO) {
+            NetSDKManager.setThermalAlarmInterval(v)
+        }
+        Log.i(
+            "AlarmInterval",
+            "config set interval=$v ok=${r.isSuccess} code=${r.code} msg=${r.message}"
+        )
+        if (r.isSuccess) savedInterval = v.toString()
+    }
+
+    LaunchedEffect(alarmInterval) {
+        if (alarmInterval == savedInterval) return@LaunchedEffect
+        delay(800)
+        saveIntervalNow()
+    }
+
     if (selectedMarker != null) {
         MarkerAlarmDetailScreen(
             markerName = selectedMarker!!,
@@ -129,7 +153,12 @@ fun AlarmConfigScreen(
 
     // ── Level 1: List page ──
 
-    BackHandler { onBack() }
+    BackHandler {
+        scope.launch {
+            saveIntervalNow()
+            onBack()
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xFFF4F5F9),
@@ -141,7 +170,12 @@ fun AlarmConfigScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            saveIntervalNow()
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
                             tint = AppColors.TextPrimary, modifier = Modifier.size(22.dp))
                     }
@@ -165,7 +199,7 @@ fun AlarmConfigScreen(
             ) {
                 Spacer(Modifier.height(8.dp))
 
-                Text(stringResource(R.string.alarm_linkage), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                Text(stringResource(R.string.alarm_interval), fontSize = 13.sp, fontWeight = FontWeight.Medium,
                     color = AppColors.TextSecondary,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp))
 
@@ -175,33 +209,11 @@ fun AlarmConfigScreen(
                     elevation = CardDefaults.cardElevation(0.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column {
-                        SwitchRow(stringResource(R.string.alarm_ftp), ftpEnabled) { newVal ->
-                            ftpEnabled = newVal
-                            scope.launch {
-                                val json = JSONObject().apply {
-                                    put("trigger_ftp_enabled", if (newVal) 1 else 0)
-                                    put("trigger_webhook_enabled", if (webhookEnabled) 1 else 0)
-                                }
-                                Log.d("AlarmConfig", "setAlarmTrigger FTP: ${json}")
-                                val r = NetSDKManager.setAlarmTrigger(1, json.toString())
-                                Log.d("AlarmConfig", "setAlarmTrigger result: success=${r.isSuccess}, code=${r.code}, msg=${r.message}")
-                            }
-                        }
-                        SettingDivider()
-                        SwitchRow(stringResource(R.string.alarm_webhook), webhookEnabled) { newVal ->
-                            webhookEnabled = newVal
-                            scope.launch {
-                                val json = JSONObject().apply {
-                                    put("trigger_ftp_enabled", if (ftpEnabled) 1 else 0)
-                                    put("trigger_webhook_enabled", if (newVal) 1 else 0)
-                                }
-                                Log.d("AlarmConfig", "setAlarmTrigger Webhook: ${json}")
-                                val r = NetSDKManager.setAlarmTrigger(1, json.toString())
-                                Log.d("AlarmConfig", "setAlarmTrigger result: success=${r.isSuccess}, code=${r.code}, msg=${r.message}")
-                            }
-                        }
-                    }
+                    InputRow(
+                        stringResource(R.string.alarm_interval),
+                        alarmInterval,
+                        stringResource(R.string.common_seconds)
+                    ) { alarmInterval = it }
                 }
 
                 Spacer(Modifier.height(16.dp))

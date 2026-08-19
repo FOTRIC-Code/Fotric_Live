@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.irtek.live.R
@@ -320,7 +322,22 @@ private fun InfoRow(label: String, value: String) {
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, fontSize = 15.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
-        Text(value.ifBlank { "-" }, fontSize = 14.sp, color = AppColors.TextSecondary)
+        Text(
+            label,
+            fontSize = 15.sp,
+            color = AppColors.TextPrimary,
+            maxLines = 1,
+            modifier = Modifier.wrapContentWidth()
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            value.ifBlank { "-" },
+            fontSize = 14.sp,
+            color = AppColors.TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
+        )
     }
 }

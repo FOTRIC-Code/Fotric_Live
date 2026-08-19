@@ -61,6 +61,7 @@ object AlarmMonitor {
     suspend fun ensureListening(entity: DeviceEntity) {
         val ip = entity.ip.trim()
         if (ip.isEmpty()) return
+        if (db?.deviceDao()?.getByIp(ip) == null) return
         mutex.withLock {
             if (listeners.containsKey(ip)) return
         }
@@ -76,18 +77,28 @@ object AlarmMonitor {
             Log.w(TAG, "ensureListening login failed: $ip")
             return
         }
+        if (db?.deviceDao()?.getByIp(ip) == null) {
+            NetSDKManager.logoutByIp(entity.ip, entity.port)
+            return
+        }
 
         mutex.withLock {
             if (listeners.containsKey(ip)) return
-            val start = NetSDKManager.startAlarmListener(handle)
-            val sid = start.data
-            if (start.isSuccess && sid != null && sid > 0L) {
+        }
+        val start = NetSDKManager.startAlarmListener(handle)
+        val sid = start.data
+        var duplicateSid: Long? = null
+        mutex.withLock {
+            if (listeners.containsKey(ip)) {
+                if (start.isSuccess && sid != null && sid > 0L) duplicateSid = sid
+            } else if (start.isSuccess && sid != null && sid > 0L) {
                 listeners[ip] = sid
                 Log.i(TAG, "alarm listener started: $ip sid=$sid")
             } else {
                 Log.w(TAG, "startAlarmListener failed: $ip ${start.message}")
             }
         }
+        duplicateSid?.let { NetSDKManager.stopAlarmListener(it) }
     }
 
     suspend fun stopListening(ip: String) {

@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualAddScreen(
+    existingIps: Set<String> = emptySet(),
     onBack: () -> Unit,
     onConnected: (ip: String, deviceName: String) -> Unit
 ) {
@@ -39,6 +40,7 @@ fun ManualAddScreen(
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
     val ipRequiredMsg = stringResource(R.string.add_error_ip_required)
+    val alreadyAddedMsg = stringResource(R.string.add_error_already_added)
     val connectFailedFmt = stringResource(R.string.add_error_connect_failed)
 
     Scaffold(
@@ -104,11 +106,16 @@ fun ManualAddScreen(
             Button(
                 onClick = {
                     if (ipAddress.isBlank()) { errorMsg = ipRequiredMsg; return@Button }
+                    val ip = ipAddress.trim()
+                    if (existingIps.any { it.equals(ip, ignoreCase = true) }) {
+                        errorMsg = alreadyAddedMsg
+                        return@Button
+                    }
                     isConnecting = true
                     errorMsg = null
                     scope.launch {
                         val result = NetSDKManager.login(
-                            ipAddress,
+                            ip,
                             port.toIntOrNull() ?: 80,
                             userName,
                             password.ifBlank { "admin" }
@@ -119,7 +126,7 @@ fun ManualAddScreen(
                                     """{"name":"${deviceName.replace("\"", "\\\"")}"}"""
                                 )
                             }
-                            onConnected(ipAddress, deviceName)
+                            onConnected(ip, deviceName)
                         } else {
                             errorMsg = String.format(connectFailedFmt, result.message)
                         }
@@ -158,7 +165,8 @@ private fun FormRow(label: String, value: String, placeholder: String, onValueCh
             fontSize = 15.sp,
             color = AppColors.TextPrimary,
             fontWeight = FontWeight.Normal,
-            modifier = Modifier.width(72.dp)
+            maxLines = 1,
+            modifier = Modifier.width(96.dp)
         )
         BasicTextField(
             value = value,

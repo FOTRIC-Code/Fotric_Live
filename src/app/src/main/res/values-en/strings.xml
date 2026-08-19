@@ -23,6 +23,7 @@
     <string name="common_operation_failed">Operation failed</string>
     <string name="common_not_supported">Not supported yet</string>
     <string name="common_seconds">s</string>
+    <string name="common_minutes">min</string>
     <string name="common_selected_count">Selected %1$d</string>
     <string name="common_warm_tip">Note</string>
     <string name="common_unknown_device">Unknown device</string>
@@ -102,7 +103,9 @@
     <string name="add_hint_user">e.g. admin</string>
     <string name="add_hint_password">Enter password</string>
     <string name="add_error_ip_required">Please enter an IP address</string>
+    <string name="add_error_already_added">This device is already added</string>
     <string name="add_error_connect_failed">Connection failed: %1$s</string>
+    <string name="add_already_added">Added</string>
     <string name="add_searching">Searching LAN devices…</string>
     <string name="add_search_done">Search finished, found %1$d device(s)</string>
     <string name="add_search_results">Search results</string>
@@ -150,6 +153,7 @@
     <string name="preview_record_fail">Recording failed</string>
 
     <string name="alarm_config_title">Alarm settings</string>
+    <string name="alarm_interval">Alarm interval</string>
     <string name="alarm_linkage">Alarm linkage</string>
     <string name="alarm_ftp">FTP upload</string>
     <string name="alarm_webhook">Webhook</string>
@@ -158,11 +162,11 @@
     <string name="alarm_switch">Alarm switch</string>
     <string name="alarm_type">Alarm type</string>
     <string name="alarm_temp">Alarm temperature</string>
-    <string name="alarm_delay">Alarm delay</string>
+    <string name="alarm_delay">Alarm temperature delay</string>
     <string name="alarm_warning_temp">Warning temperature</string>
-    <string name="alarm_warning_delay">Warning delay</string>
-    <string name="alarm_alert_temp">Alert temperature</string>
-    <string name="alarm_alert_delay">Alert delay</string>
+    <string name="alarm_warning_delay">Warning temperature delay</string>
+    <string name="alarm_alert_temp">Alert</string>
+    <string name="alarm_alert_delay">Alert temperature delay</string>
     <string name="alarm_save_settings">Save settings</string>
     <string name="alarm_marker_fmt">Marker %1$d</string>
     <string name="alarm_cond_high_gt">High &gt; threshold</string>

@@ -777,7 +777,7 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
     var isLoading by remember { mutableStateOf(true) }
     // SDK: AUTOMATIC=0, MANUAL=1
     var shutterMode by remember { mutableIntStateOf(0) }
-    var shutterInterval by remember { mutableStateOf("10") }
+    var shutterInterval by remember { mutableStateOf("1") }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -810,7 +810,7 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
             }
             if (shutterMode == 0) {
                 SettingDivider()
-                EditRow(stringResource(R.string.edit_auto_interval), shutterInterval, KeyboardType.Number, suffix = stringResource(R.string.common_seconds)) {
+                EditRow(stringResource(R.string.edit_auto_interval), shutterInterval, KeyboardType.Number, suffix = stringResource(R.string.common_minutes)) {
                     shutterInterval = it
                 }
             }
@@ -842,7 +842,7 @@ private fun ThermalShutterDetailPage(onBack: () -> Unit) {
             scope.launch {
                 val mr = NetSDKManager.setThermalShutterMode(shutterMode)
                 val tr = if (shutterMode == 0) {
-                    NetSDKManager.setThermalShutterTime(shutterInterval.toIntOrNull() ?: 10)
+                    NetSDKManager.setThermalShutterTime(shutterInterval.toIntOrNull() ?: 1)
                 } else {
                     NetSDKResult(0, Unit)
                 }

@@ -141,17 +141,25 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onDeleteDevice = { device ->
+                                val id = device.id.toLongOrNull() ?: return@DeviceListScreen
                                 scope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        val entity = deviceEntities.find { it.id.toString() == device.id }
-                                        if (entity != null) {
-                                            AlarmMonitor.stopListening(entity.ip)
-                                            NetSDKManager.logoutByIp(entity.ip, entity.port)
-                                            AlarmMonitor.deleteImageFiles(
-                                                db.alarmDao().getImagePathsByDevice(entity.id)
-                                            )
+                                    val entity = withContext(Dispatchers.IO) {
+                                        val e = db.deviceDao().getById(id)
+                                        val paths = e?.let {
+                                            db.alarmDao().getImagePathsByDevice(it.id)
+                                        }.orEmpty()
+                                        // Remove the row first so the list updates even if JNI logout blocks.
+                                        db.deviceDao().deleteById(id)
+                                        AlarmMonitor.deleteImageFiles(paths)
+                                        e
+                                    }
+                                    if (entity != null) {
+                                        launch(Dispatchers.IO) {
+                                            runCatching {
+                                                AlarmMonitor.stopListening(entity.ip)
+                                                NetSDKManager.logoutByIp(entity.ip, entity.port)
+                                            }
                                         }
-                                        db.deviceDao().deleteById(device.id.toLong())
                                     }
                                 }
                             },
@@ -249,6 +257,7 @@ class MainActivity : ComponentActivity() {
                     is Screen.ManualAdd -> {
                         BackHandler { screen = Screen.AddDevice }
                         ManualAddScreen(
+                            existingIps = deviceEntities.map { it.ip.trim() }.toSet(),
                             onBack = { screen = Screen.AddDevice },
                             onConnected = { ip, userDeviceName ->
                                 scope.launch {
@@ -263,6 +272,8 @@ class MainActivity : ComponentActivity() {
                     is Screen.OnlineAdd -> {
                         BackHandler { screen = Screen.AddDevice }
                         OnlineAddScreen(
+                            addedIps = deviceEntities.map { it.ip.trim() }.toSet(),
+                            addedSerials = deviceEntities.map { it.serialNo.trim() }.filter { it.isNotEmpty() }.toSet(),
                             onBack = { screen = Screen.AddDevice },
                             onDeviceAdd = { deviceJson ->
                                 scope.launch {
@@ -278,7 +289,6 @@ class MainActivity : ComponentActivity() {
                                             thumbDir
                                         )
                                     }
-                                    screen = Screen.DeviceList
                                 }
                             }
                         )
@@ -411,28 +421,16 @@ private suspend fun saveDeviceAfterLogin(db: AppDatabase, ip: String, thumbDir: 
             sn = d.optString("serial_no")
             fw = d.optString("firmware_version")
         }
+        if (db.deviceDao().getByIp(ip.trim()) != null) return@withContext
         thumbPath = captureThumb(thumbDir, ip)
-        val existing = db.deviceDao().getByIp(ip)
-        if (existing != null) {
-            db.deviceDao().update(existing.copy(
-                name = name,
-                model = model.ifBlank { existing.model },
-                serialNo = sn.ifBlank { existing.serialNo },
-                firmwareVersion = fw.ifBlank { existing.firmwareVersion },
+        db.deviceDao().insert(
+            DeviceEntity(
+                name = name, ip = ip.trim(), model = model,
+                serialNo = sn, firmwareVersion = fw,
                 status = DeviceEntity.STATUS_ONLINE,
-                thumbnailPath = thumbPath.ifBlank { existing.thumbnailPath },
-                updatedAt = System.currentTimeMillis()
-            ))
-        } else {
-            db.deviceDao().insert(
-                DeviceEntity(
-                    name = name, ip = ip, model = model,
-                    serialNo = sn, firmwareVersion = fw,
-                    status = DeviceEntity.STATUS_ONLINE,
-                    thumbnailPath = thumbPath
-                )
+                thumbnailPath = thumbPath
             )
-        }
+        )
     }
 }
 
@@ -443,12 +441,19 @@ private suspend fun saveDeviceByIp(
 ) {
     withContext(Dispatchers.IO) {
         if (!thumbDir.exists()) thumbDir.mkdirs()
-        var name = discoveredName.ifBlank { ip }
+        val ipKey = ip.trim()
+        if (ipKey.isEmpty() || db.deviceDao().getByIp(ipKey) != null) return@withContext
+        if (fallbackSn.isNotBlank() &&
+            db.deviceDao().getAllOnce().any { it.serialNo.equals(fallbackSn.trim(), ignoreCase = true) }
+        ) {
+            return@withContext
+        }
+        var name = discoveredName.ifBlank { ipKey }
         var model = fallbackModel
         var sn = fallbackSn
         var fw = fallbackFw
         var thumbPath = ""
-        val loginResult = NetSDKManager.login(ip, 80, "admin", "admin")
+        val loginResult = NetSDKManager.login(ipKey, 80, "admin", "admin")
         if (loginResult.isSuccess) {
             val info = NetSDKManager.getDeviceInfo()
             if (info.isSuccess && info.data != null) {
@@ -458,29 +463,17 @@ private suspend fun saveDeviceByIp(
                 sn = d.optString("serial_no").ifBlank { fallbackSn }
                 fw = d.optString("firmware_version").ifBlank { fallbackFw }
             }
-            thumbPath = captureThumb(thumbDir, ip)
+            thumbPath = captureThumb(thumbDir, ipKey)
             // Keep login; logout only on app exit or device delete.
         }
-        val existing = db.deviceDao().getByIp(ip)
-        if (existing != null) {
-            db.deviceDao().update(existing.copy(
-                name = name,
-                model = model.ifBlank { existing.model },
-                serialNo = sn.ifBlank { existing.serialNo },
-                firmwareVersion = fw.ifBlank { existing.firmwareVersion },
-                thumbnailPath = thumbPath.ifBlank { existing.thumbnailPath },
-                updatedAt = System.currentTimeMillis()
-            ))
-        } else {
-            db.deviceDao().insert(
-                DeviceEntity(
-                    name = name, ip = ip, model = model,
-                    serialNo = sn, firmwareVersion = fw,
-                    status = DeviceEntity.STATUS_OFFLINE,
-                    thumbnailPath = thumbPath
-                )
+        db.deviceDao().insert(
+            DeviceEntity(
+                name = name, ip = ipKey, model = model,
+                serialNo = sn, firmwareVersion = fw,
+                status = DeviceEntity.STATUS_OFFLINE,
+                thumbnailPath = thumbPath
             )
-        }
+        )
     }
 }
 
@@ -524,7 +517,9 @@ private suspend fun refreshAllThumbs(db: AppDatabase, thumbDir: File) {
         for (entity in db.deviceDao().getAllOnce()) {
             val handle = NetSDKManager.findHandle(entity.ip, entity.port) ?: continue
             val thumbPath = captureThumb(thumbDir, entity.ip, handle)
-            if (thumbPath.isNotBlank() && thumbPath != entity.thumbnailPath) {
+            if (thumbPath.isNotBlank() && thumbPath != entity.thumbnailPath &&
+                db.deviceDao().getById(entity.id) != null
+            ) {
                 db.deviceDao().update(entity.copy(
                     thumbnailPath = thumbPath,
                     updatedAt = System.currentTimeMillis()
@@ -535,9 +530,16 @@ private suspend fun refreshAllThumbs(db: AppDatabase, thumbDir: File) {
 }
 
 private suspend fun refreshOneDevice(db: AppDatabase, entity: DeviceEntity) {
+    if (db.deviceDao().getById(entity.id) == null) return
+
     var handle = NetSDKManager.ensureLogin(
         entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
     ).data
+
+    if (db.deviceDao().getById(entity.id) == null) {
+        NetSDKManager.logoutByIp(entity.ip, entity.port)
+        return
+    }
 
     if (handle == null || handle == 0L) {
         db.deviceDao().updateStatus(entity.id, DeviceEntity.STATUS_OFFLINE)
@@ -546,6 +548,10 @@ private suspend fun refreshOneDevice(db: AppDatabase, entity: DeviceEntity) {
 
     var info = NetSDKManager.getDeviceInfo(handle)
     if (!info.isSuccess) {
+        if (db.deviceDao().getById(entity.id) == null) {
+            NetSDKManager.logoutByIp(entity.ip, entity.port)
+            return
+        }
         NetSDKManager.logout(handle)
         handle = NetSDKManager.login(
             entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
@@ -569,6 +575,11 @@ private suspend fun refreshOneDevice(db: AppDatabase, entity: DeviceEntity) {
         fw = d.optString("firmware_version").ifBlank { entity.firmwareVersion }
     }
 
+    if (db.deviceDao().getById(entity.id) == null) {
+        NetSDKManager.logoutByIp(entity.ip, entity.port)
+        return
+    }
+
     // Mark online before capture so a hung snapshot cannot leave the spinner forever.
     db.deviceDao().update(
         entity.copy(
@@ -581,6 +592,10 @@ private suspend fun refreshOneDevice(db: AppDatabase, entity: DeviceEntity) {
             updatedAt = System.currentTimeMillis()
         )
     )
+    if (db.deviceDao().getById(entity.id) == null) {
+        NetSDKManager.logoutByIp(entity.ip, entity.port)
+        return
+    }
     AlarmMonitor.ensureListening(entity)
 }
 
