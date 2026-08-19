@@ -9,7 +9,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.irtek</groupId>
   <artifactId>netsdk</artifactId>
-  <version>1.0.1.74</version>
+  <version>1.0.1.75</version>
   <packaging>aar</packaging>
   <name>IRtekNetSDK</name>
   <description>IRtek thermal camera network SDK (Android JNI)</description>
