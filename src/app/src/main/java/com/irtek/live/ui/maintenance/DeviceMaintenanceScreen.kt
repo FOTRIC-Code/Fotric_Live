@@ -151,15 +151,6 @@ fun DeviceMaintenanceScreen(
                     SettingDivider()
 
                     MaintenanceRow(
-                        title = stringResource(R.string.maint_upgrade),
-                        subtitle = stringResource(R.string.maint_upgrade_desc)
-                    ) {
-                        Toast.makeText(context, context.getString(R.string.common_not_supported), Toast.LENGTH_SHORT).show()
-                    }
-
-                    SettingDivider()
-
-                    MaintenanceRow(
                         title = stringResource(R.string.maint_reset),
                         subtitle = stringResource(R.string.maint_reset_desc)
                     ) { showResetDialog = true }
