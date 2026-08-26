@@ -123,6 +123,7 @@
     <string name="msg_marker">Measurement object</string>
     <string name="msg_current_temp">Current temperature</string>
     <string name="msg_threshold">Threshold</string>
+    <string name="msg_alarm_level">Alarm level</string>
     <string name="msg_type_temp">Temperature alarm</string>
     <string name="msg_type_device">Device alarm</string>
     <string name="msg_type_intrusion">Intrusion alarm</string>

@@ -471,6 +471,8 @@ fun MessageDetailScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            val markers = remember(item.alarm) { item.alarm.markerDetails() }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(AppSpacing.CardCorner),
@@ -496,26 +498,58 @@ fun MessageDetailScreen(
                     DetailRow(stringResource(R.string.msg_type), alarmTypeLabel(item.alarm))
                     DetailRow(stringResource(R.string.common_device_name), item.deviceName)
                     DetailRow(stringResource(R.string.msg_time), fullTimeFormat.format(Date(item.alarm.timestamp)))
-                    if (item.alarm.markerName.isNotBlank()) {
-                        DetailRow(
-                            stringResource(R.string.msg_marker),
-                            if (item.alarm.markerName == "global") stringResource(R.string.common_global) else item.alarm.markerName
-                        )
-                    }
-                    if (item.alarm.temperature != 0.0) {
-                        DetailRow(
-                            stringResource(R.string.msg_current_temp),
-                            "%.1f℃".format(Locale.US, item.alarm.temperature)
-                        )
-                    }
-                    if (item.alarm.threshold != 0.0) {
-                        DetailRow(
-                            stringResource(R.string.msg_threshold),
-                            "%.1f℃".format(Locale.US, item.alarm.threshold)
-                        )
-                    }
                     if (item.alarm.content.isNotBlank()) {
                         DetailRow(stringResource(R.string.common_content), item.alarm.content)
+                    }
+                }
+            }
+
+            markers.forEach { marker ->
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AppSpacing.CardCorner),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        val displayName = when {
+                            marker.markerName.isBlank() -> "—"
+                            marker.markerName == "global" -> stringResource(R.string.common_global)
+                            else -> marker.markerName
+                        }
+                        Text(
+                            displayName,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AppColors.TextPrimary
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        DetailRow(stringResource(R.string.msg_marker), displayName)
+                        if (marker.alarmType > 0) {
+                            val cond = markerConditionLabel(marker.alarmType)
+                            if (cond.isNotBlank()) {
+                                DetailRow(stringResource(R.string.alarm_type), cond)
+                            }
+                        }
+                        if (marker.level > 0) {
+                            DetailRow(
+                                stringResource(R.string.msg_alarm_level),
+                                markerLevelLabel(marker.level)
+                            )
+                        }
+                        if (marker.temperature != 0.0) {
+                            DetailRow(
+                                stringResource(R.string.msg_current_temp),
+                                "%.1f℃".format(Locale.US, marker.temperature)
+                            )
+                        }
+                        if (marker.threshold != 0.0) {
+                            DetailRow(
+                                stringResource(R.string.msg_threshold),
+                                "%.1f℃".format(Locale.US, marker.threshold)
+                            )
+                        }
                     }
                 }
             }
@@ -546,6 +580,27 @@ private fun DetailRow(label: String, value: String) {
         )
     }
     HorizontalDivider(color = Color(0xFFF0F0F0))
+}
+
+@Composable
+private fun markerConditionLabel(alarmType: Int): String = when (alarmType) {
+    1 -> stringResource(R.string.alarm_cond_high_gt)
+    2 -> stringResource(R.string.alarm_cond_high_lt)
+    3 -> stringResource(R.string.alarm_cond_low_gt)
+    4 -> stringResource(R.string.alarm_cond_low_lt)
+    5 -> stringResource(R.string.alarm_cond_avg_gt)
+    6 -> stringResource(R.string.alarm_cond_avg_lt)
+    7 -> stringResource(R.string.alarm_cond_diff_gt)
+    8 -> stringResource(R.string.alarm_cond_diff_lt)
+    else -> ""
+}
+
+@Composable
+private fun markerLevelLabel(level: Int): String = when (level) {
+    1 -> stringResource(R.string.alarm_level_alert)
+    2 -> stringResource(R.string.alarm_level_warning)
+    3 -> stringResource(R.string.alarm_level_alarm)
+    else -> ""
 }
 
 @Composable

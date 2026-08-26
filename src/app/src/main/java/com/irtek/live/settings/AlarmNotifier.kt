@@ -13,7 +13,7 @@ import com.irtek.live.R
 
 object AlarmNotifier {
     private const val CHANNEL_ID = "alarm_messages"
-    private const val CHANNEL_NAME = "Alarm notifications"
+    const val EXTRA_OPEN_MESSAGES = "open_messages"
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -43,13 +43,19 @@ object AlarmNotifier {
         val nm = NotificationManagerCompat.from(context)
         if (!nm.areNotificationsEnabled()) return
 
+        // Bring the existing singleTask MainActivity to front; do not spawn a second task.
         val open = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("open_messages", true)
+            action = Intent.ACTION_MAIN
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_OPEN_MESSAGES, true)
         }
         val pending = PendingIntent.getActivity(
             context,
-            alarmId.toInt(),
+            // Stable request code so extras refresh on the same PendingIntent.
+            1001,
             open,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

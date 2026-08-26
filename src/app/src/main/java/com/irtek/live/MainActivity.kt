@@ -1,6 +1,7 @@
 package com.irtek.live
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import com.irtek.live.alarm.AlarmMonitor
 import com.irtek.live.data.AppDatabase
 import com.irtek.live.data.entity.DeviceEntity
+import com.irtek.live.settings.AlarmNotifier
 import com.irtek.live.settings.LocaleHelper
 import com.irtek.live.ui.adddevice.AddDeviceScreen
 import com.irtek.live.ui.adddevice.ManualAddScreen
@@ -28,14 +30,20 @@ import com.irtek.live.ui.theme.LiveTheme
 import com.irtek.netsdk.NetSDKManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 class MainActivity : ComponentActivity() {
+
+    /** Bumped when a notification asks to show the messages tab. */
+    private val openMessagesSignal = MutableStateFlow(0)
+    private val openMessagesSeq = AtomicInteger(0)
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.wrap(newBase))
@@ -44,6 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_Live)
         super.onCreate(savedInstanceState)
+        consumeOpenMessagesIntent(intent)
         val db = (application as LiveApp).database
         enableEdgeToEdge()
         setContent {
@@ -52,7 +61,23 @@ class MainActivity : ComponentActivity() {
                 var screen by remember { mutableStateOf<Screen>(Screen.Splash) }
                 var didWarmLogin by remember { mutableStateOf(false) }
                 var selectedNav by remember {
-                    mutableIntStateOf(if (intent?.getBooleanExtra("open_messages", false) == true) 1 else 0)
+                    mutableIntStateOf(
+                        if (intent?.getBooleanExtra(AlarmNotifier.EXTRA_OPEN_MESSAGES, false) == true) 1 else 0
+                    )
+                }
+                val openMessagesTick by openMessagesSignal.collectAsState()
+                LaunchedEffect(openMessagesTick) {
+                    if (openMessagesTick <= 0) return@LaunchedEffect
+                    selectedNav = 1
+                    // Leave nested screens (e.g. preview) so the messages tab is reachable.
+                    if (screen !is Screen.Splash && screen !is Screen.DeviceList) {
+                        if (screen is Screen.Preview) {
+                            withContext(Dispatchers.IO) {
+                                runCatching { NetSDKManager.stopStream() }
+                            }
+                        }
+                        screen = Screen.DeviceList
+                    }
                 }
                 val captureDir = remember { File(filesDir, "captures") }
                 val recordDir = remember { File(filesDir, "records") }
@@ -208,7 +233,16 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             },
-                            onNavSelect = { selectedNav = it },
+                            onNavSelect = { tab ->
+                                selectedNav = tab
+                                // Returning to messages: force rebind in case alarm RTP died
+                                // while the map still thought the listener was alive.
+                                if (tab == 1) {
+                                    scope.launch(Dispatchers.IO) {
+                                        AlarmMonitor.reensureAll(forceRestart = true)
+                                    }
+                                }
+                            },
                             messageContent = {
                                 MessageScreen(
                                     messages = messageItems,
@@ -395,8 +429,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeOpenMessagesIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        AlarmMonitor.onAppResumed()
+    }
+
+    private fun consumeOpenMessagesIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(AlarmNotifier.EXTRA_OPEN_MESSAGES, false) != true) return
+        // Prevent re-open on configuration recreate of the same intent.
+        intent.removeExtra(AlarmNotifier.EXTRA_OPEN_MESSAGES)
+        openMessagesSignal.value = openMessagesSeq.incrementAndGet()
+    }
+
     override fun onDestroy() {
         // Application.onTerminate is unreliable on real devices; release all logins here.
+        // Only clean up when this task is truly finishing (singleTask avoids duplicate Activity cleanup races).
         if (isFinishing && !isChangingConfigurations) {
             kotlinx.coroutines.runBlocking {
                 AlarmMonitor.stopAll()
@@ -553,9 +606,11 @@ private suspend fun refreshOneDevice(db: AppDatabase, entity: DeviceEntity) {
     var info = NetSDKManager.getDeviceInfo(handle)
     if (!info.isSuccess) {
         if (db.deviceDao().getById(entity.id) == null) {
+            AlarmMonitor.stopListening(entity.ip)
             NetSDKManager.logoutByIp(entity.ip, entity.port)
             return
         }
+        AlarmMonitor.stopListening(entity.ip)
         NetSDKManager.logout(handle)
         handle = NetSDKManager.login(
             entity.ip, entity.port, entity.userName, entity.password.ifBlank { "admin" }
