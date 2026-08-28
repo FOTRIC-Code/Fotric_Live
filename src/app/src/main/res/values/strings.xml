@@ -8,6 +8,7 @@
     <string name="common_cancel">取消</string>
     <string name="common_save">保存</string>
     <string name="common_delete">删除</string>
+    <string name="common_share">分享</string>
     <string name="common_select">选择</string>
     <string name="common_select_all">全选</string>
     <string name="common_deselect_all">取消全选</string>
@@ -141,6 +142,7 @@
     <string name="gallery_empty">暂无内容</string>
     <string name="gallery_delete_title">删除文件</string>
     <string name="gallery_delete_confirm">确定删除选中的 %1$d 个文件？此操作不可恢复。</string>
+    <string name="gallery_share_title">分享到</string>
 
     <!-- Preview -->
     <string name="preview_capture">抓图</string>

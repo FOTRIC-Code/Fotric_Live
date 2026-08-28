@@ -2,6 +2,9 @@
 
 package com.irtek.live.ui.gallery
 
+import android.content.ClipData
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import androidx.activity.compose.BackHandler
@@ -23,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -43,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.irtek.live.R
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.live.ui.theme.AppSpacing
@@ -51,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.ArrayList
 import java.util.Date
 import java.util.Locale
 
@@ -65,6 +71,7 @@ fun GalleryScreen(
     captureDir: File,
     recordDir: File
 ) {
+    val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf(
         stringResource(R.string.gallery_tab_all),
@@ -142,6 +149,12 @@ fun GalleryScreen(
                         emptySet()
                     } else {
                         items.map { it.file.absolutePath }.toSet()
+                    }
+                },
+                onShareClick = {
+                    val selected = items.filter { it.file.absolutePath in selectedPaths }
+                    if (selected.isNotEmpty()) {
+                        shareGalleryItems(context, selected)
                     }
                 },
                 onDeleteClick = {
@@ -276,6 +289,7 @@ private fun GalleryTopBar(
     onEnterSelect: () -> Unit,
     onCancelSelect: () -> Unit,
     onToggleSelectAll: () -> Unit,
+    onShareClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Row(
@@ -300,6 +314,15 @@ private fun GalleryTopBar(
                 Text(
                     if (selectedCount == totalCount && totalCount > 0) stringResource(R.string.common_deselect_all) else stringResource(R.string.common_select_all),
                     color = Color(0xFF0256FF)
+                )
+            }
+            TextButton(
+                onClick = onShareClick,
+                enabled = selectedCount > 0
+            ) {
+                Text(
+                    stringResource(R.string.common_share),
+                    color = if (selectedCount > 0) Color(0xFF0256FF) else AppColors.TextSecondary
                 )
             }
             TextButton(
@@ -455,14 +478,14 @@ private fun GalleryPreview(
                     IconButton(
                         onClick = {
                             try {
-                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                val uri = FileProvider.getUriForFile(
                                     context,
                                     "${context.packageName}.fileprovider",
                                     item.file
                                 )
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(uri, "video/mp4")
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(intent)
                             } catch (_: Exception) {
@@ -513,7 +536,68 @@ private fun GalleryPreview(
                     )
                 }
             }
+            if (current != null) {
+                IconButton(onClick = { shareGalleryItems(context, listOf(current)) }) {
+                    Icon(
+                        Icons.Filled.Share,
+                        contentDescription = stringResource(R.string.common_share),
+                        tint = Color.White
+                    )
+                }
+            }
         }
+    }
+}
+
+private fun mimeTypeOf(item: GalleryItem): String {
+    val ext = item.file.extension.lowercase()
+    return when {
+        item.isVideo -> when (ext) {
+            "avi" -> "video/x-msvideo"
+            "mkv" -> "video/x-matroska"
+            else -> "video/mp4"
+        }
+        else -> when (ext) {
+            "png" -> "image/png"
+            "bmp" -> "image/bmp"
+            "jpeg", "jpg" -> "image/jpeg"
+            else -> "image/*"
+        }
+    }
+}
+
+private fun shareGalleryItems(context: Context, items: List<GalleryItem>) {
+    if (items.isEmpty()) return
+    try {
+        val authority = "${context.packageName}.fileprovider"
+        val uris = items.map { FileProvider.getUriForFile(context, authority, it.file) }
+        val intent = if (uris.size == 1) {
+            val item = items.first()
+            Intent(Intent.ACTION_SEND).apply {
+                type = mimeTypeOf(item)
+                putExtra(Intent.EXTRA_STREAM, uris.first())
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            val allImages = items.all { !it.isVideo }
+            val allVideos = items.all { it.isVideo }
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = when {
+                    allImages -> "image/*"
+                    allVideos -> "video/*"
+                    else -> "*/*"
+                }
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        // ClipData so chooser targets receive read permission for all URIs
+        intent.clipData = ClipData.newUri(context.contentResolver, "share", uris.first()).also { clip ->
+            uris.drop(1).forEach { uri -> clip.addItem(ClipData.Item(uri)) }
+        }
+        val title = context.getString(R.string.gallery_share_title)
+        context.startActivity(Intent.createChooser(intent, title))
+    } catch (_: Exception) {
     }
 }
 
