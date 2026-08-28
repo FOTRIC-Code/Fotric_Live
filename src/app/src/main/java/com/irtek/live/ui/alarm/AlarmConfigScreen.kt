@@ -328,8 +328,7 @@ private fun MarkerAlarmDetailScreen(
     val alarmTypeLabels = listOf(
         stringResource(R.string.alarm_cond_high_gt), stringResource(R.string.alarm_cond_high_lt),
         stringResource(R.string.alarm_cond_low_gt), stringResource(R.string.alarm_cond_low_lt),
-        stringResource(R.string.alarm_cond_avg_gt), stringResource(R.string.alarm_cond_avg_lt),
-        stringResource(R.string.alarm_cond_diff_gt), stringResource(R.string.alarm_cond_diff_lt)
+        stringResource(R.string.alarm_cond_avg_gt), stringResource(R.string.alarm_cond_avg_lt)
     )
 
     val displayName = if (markerName == "global") stringResource(R.string.common_global) else markerName
@@ -352,7 +351,9 @@ private fun MarkerAlarmDetailScreen(
                 val obj = allAlarms.getJSONObject(i)
                 if (obj.optString("marker_name") == markerName) {
                     alarmEnabled = obj.optInt("enabled", 0) == 1
-                    alarmTypeIndex = (obj.optInt("alarm_type", 1) - 1).coerceIn(0, 7)
+                    // Types 7/8 were 温差; no longer offered — fall back to high>.
+                    val rawType = obj.optInt("alarm_type", 1)
+                    alarmTypeIndex = if (rawType in 1..6) rawType - 1 else 0
                     alarmTemp = fmt1(obj.optDouble("alarm_temp", 80.0))
                     alarmDelay = obj.optInt("alarm_delay_time", 0).toString()
                     thresholdTemp = fmt1(
