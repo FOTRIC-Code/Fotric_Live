@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,21 +36,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MineScreen(
-    onLanguageChanged: () -> Unit = {}
-) {
+fun MineScreen() {
     val context = LocalContext.current
     var notificationEnabled by remember {
         mutableStateOf(AppPreferences.isNotificationsEnabled(context))
     }
-    var showLanguageDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
-    val currentLang = remember { AppPreferences.getLanguage(context) }
-    val languageLabel = if (currentLang == AppPreferences.LANG_EN) {
-        stringResource(R.string.mine_lang_en)
-    } else {
-        stringResource(R.string.mine_lang_zh)
-    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -149,33 +139,6 @@ fun MineScreen(
             )
 
             SettingsRow(
-                icon = Icons.Outlined.Language,
-                label = stringResource(R.string.mine_language),
-                trailing = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            languageLabel,
-                            fontSize = 14.sp,
-                            color = AppColors.TextSecondary
-                        )
-                        Icon(
-                            Icons.Outlined.ChevronRight,
-                            contentDescription = null,
-                            tint = AppColors.TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                },
-                onClick = { showLanguageDialog = true }
-            )
-
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 12.dp),
-                thickness = 0.5.dp,
-                color = Color(0x0F1D2129)
-            )
-
-            SettingsRow(
                 icon = Icons.Outlined.Info,
                 label = stringResource(R.string.mine_about),
                 trailing = {
@@ -189,46 +152,6 @@ fun MineScreen(
                 onClick = { showAboutDialog = true }
             )
         }
-    }
-
-    if (showLanguageDialog) {
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(stringResource(R.string.mine_choose_language)) },
-            text = {
-                Column {
-                    LanguageOption(
-                        label = stringResource(R.string.mine_lang_zh),
-                        selected = currentLang == AppPreferences.LANG_ZH
-                    ) {
-                        if (currentLang != AppPreferences.LANG_ZH) {
-                            AppPreferences.setLanguage(context, AppPreferences.LANG_ZH)
-                            showLanguageDialog = false
-                            onLanguageChanged()
-                        } else {
-                            showLanguageDialog = false
-                        }
-                    }
-                    LanguageOption(
-                        label = stringResource(R.string.mine_lang_en),
-                        selected = currentLang == AppPreferences.LANG_EN
-                    ) {
-                        if (currentLang != AppPreferences.LANG_EN) {
-                            AppPreferences.setLanguage(context, AppPreferences.LANG_EN)
-                            showLanguageDialog = false
-                            onLanguageChanged()
-                        } else {
-                            showLanguageDialog = false
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
-                    Text(stringResource(R.string.mine_cancel))
-                }
-            }
-        )
     }
 
     if (showAboutDialog) {
@@ -263,29 +186,6 @@ fun MineScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun LanguageOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF0079FF))
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 15.sp, color = AppColors.TextPrimary)
     }
 }
 

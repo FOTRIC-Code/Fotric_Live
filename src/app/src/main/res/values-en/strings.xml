@@ -58,16 +58,11 @@
 
     <string name="mine_title">Me</string>
     <string name="mine_notifications">Notifications</string>
-    <string name="mine_language">Language</string>
     <string name="mine_about">About</string>
-    <string name="mine_lang_zh">简体中文</string>
-    <string name="mine_lang_en">English</string>
-    <string name="mine_choose_language">Choose language</string>
     <string name="mine_about_title">About</string>
     <string name="mine_app_version">App version</string>
     <string name="mine_sdk_version">SDK version</string>
     <string name="mine_ok">OK</string>
-    <string name="mine_cancel">Cancel</string>
     <string name="mine_notification_permission_hint">Please allow notification permission to receive alarm alerts</string>
 
     <string name="notification_channel_name">Alarm notifications</string>

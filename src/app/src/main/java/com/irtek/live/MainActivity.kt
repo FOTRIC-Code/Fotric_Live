@@ -274,9 +274,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             mineContent = {
-                                MineScreen(
-                                    onLanguageChanged = { recreate() }
-                                )
+                                MineScreen()
                             }
                         )
                     }
