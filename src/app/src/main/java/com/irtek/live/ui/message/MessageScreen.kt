@@ -29,12 +29,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.irtek.live.R
 import com.irtek.live.data.entity.AlarmMessage
+import com.irtek.live.settings.AlarmLabels
 import com.irtek.live.ui.theme.AppColors
 import com.irtek.live.ui.theme.AppSpacing
 import com.irtek.live.ui.theme.AppTypo
@@ -332,7 +334,8 @@ private fun MessageCard(
             Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                val alarmLabel = alarmTypeLabel(item.alarm)
+                val context = LocalContext.current
+                val alarmLabel = AlarmLabels.displayType(context, item.alarm)
 
                 Text(
                     alarmLabel,
@@ -472,6 +475,9 @@ fun MessageDetailScreen(
             Spacer(Modifier.height(12.dp))
 
             val markers = remember(item.alarm) { item.alarm.markerDetails() }
+            val context = LocalContext.current
+            val displayTitle = AlarmLabels.displayTitle(context, item.alarm)
+            val displayType = AlarmLabels.displayType(context, item.alarm)
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -481,21 +487,21 @@ fun MessageDetailScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        item.alarm.title.ifBlank { alarmTypeLabel(item.alarm) },
+                        displayTitle,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AppColors.TextPrimary
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        alarmTypeLabel(item.alarm),
+                        displayType,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFFDC2626)
                     )
 
                     Spacer(Modifier.height(16.dp))
-                    DetailRow(stringResource(R.string.msg_type), alarmTypeLabel(item.alarm))
+                    DetailRow(stringResource(R.string.msg_type), displayType)
                     DetailRow(stringResource(R.string.common_device_name), item.deviceName)
                     DetailRow(stringResource(R.string.msg_time), fullTimeFormat.format(Date(item.alarm.timestamp)))
                     if (item.alarm.content.isNotBlank()) {
@@ -601,21 +607,4 @@ private fun markerLevelLabel(level: Int): String = when (level) {
     2 -> stringResource(R.string.alarm_level_warning)
     3 -> stringResource(R.string.alarm_level_alarm)
     else -> ""
-}
-
-@Composable
-private fun alarmTypeLabel(alarm: AlarmMessage): String {
-    val deviceAlarmLabel = stringResource(R.string.msg_type_device)
-    val intrusionLabel = stringResource(R.string.msg_type_intrusion)
-    val tempLabel = stringResource(R.string.msg_type_temp)
-    return when {
-        alarm.type.isNotBlank() &&
-            !alarm.type.contains("温度报警") &&
-            !alarm.type.contains("设备报警") -> alarm.type
-        alarm.type.contains("入侵") -> intrusionLabel
-        alarm.type.contains("温度") || alarm.type.contains("temp", ignoreCase = true) -> tempLabel
-        alarm.type.contains("设备报警") -> deviceAlarmLabel
-        alarm.type.isNotBlank() -> alarm.type
-        else -> tempLabel
-    }
 }

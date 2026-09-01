@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import com.irtek.live.R
 import com.irtek.live.data.entity.AlarmMessage
+import com.irtek.live.settings.AlarmLabels
 import com.irtek.live.ui.message.MessageDetailScreen
 import com.irtek.live.ui.message.MessageItem
 import com.irtek.live.ui.theme.AppColors
@@ -795,6 +796,7 @@ private fun AlarmItem(
     thumbnailPath: String,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
     var bitmap by remember(thumbnailPath) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     LaunchedEffect(thumbnailPath) {
@@ -847,7 +849,7 @@ private fun AlarmItem(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                alarm.title.ifBlank { alarm.type.ifBlank { stringResource(R.string.msg_type_temp) } },
+                AlarmLabels.displayTitle(context, alarm),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.TextPrimary,
