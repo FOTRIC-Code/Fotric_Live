@@ -1,44 +1,44 @@
 # Live.Android
 
-IRtek Live - 红外热像仪网络视频流应用
+IRtek Live — a network video streaming app for infrared thermal cameras
 
-## 目录结构
+## Directory layout
 
 ```
 Live.Android/
-├── src/                             # Android 项目源码
+├── src/                             # Android project source
 │   ├── settings.gradle
 │   ├── build.gradle
 │   ├── gradle/
-│   ├── repo/                            # 本地 Maven（com.irtek:netsdk AAR+POM）
+│   ├── repo/                            # Local Maven (com.irtek:netsdk AAR + POM)
 │   ├── app/
 │   │   ├── build.gradle
 │   │   └── src/main/
 │   │       ├── AndroidManifest.xml
 │   │       └── java/com/irtek/live/
-│   │           ├── LiveApp.kt           # Application (SDK 初始化)
-│   │           ├── MainActivity.kt      # 入口
-│   │           ├── data/model/          # 数据模型
+│   │           ├── LiveApp.kt           # Application (SDK initialization)
+│   │           ├── MainActivity.kt      # Entry point
+│   │           ├── data/model/          # Data models
 │   │           ├── ui/
-│   │           │   ├── theme/           # 主题
-│   │           │   ├── connect/         # 连接页面
-│   │           │   ├── device/          # 设备页面
-│   │           │   ├── settings/        # 设置 (8个Tab)
-│   │           │   └── components/      # 通用组件
-│   │           └── util/                # 工具类
+│   │           │   ├── theme/           # Theme
+│   │           │   ├── connect/         # Connection screen
+│   │           │   ├── device/          # Device screen
+│   │           │   ├── settings/        # Settings (8 tabs)
+│   │           │   └── components/      # Shared components
+│   │           └── util/                # Utilities
 │   ├── gradlew / gradlew.bat
 │   └── local.properties
-├── docs/                            # 文档
+├── docs/                            # Documentation
 └── README.md
 ```
 
-## 技术栈
+## Tech stack
 
 - Kotlin + Jetpack Compose + Material3
-- IRtekNetSDK (红外热像仪网络SDK)
+- IRtekNetSDK (infrared thermal camera network SDK)
 - compileSdk 36 / minSdk 24 / targetSdk 36
 - Gradle 8.13 / AGP 8.13.2 / Kotlin 2.2.0
 
-## 构建
+## Build
 
-用 Android Studio 打开 `src/` 目录即可构建。
+Open the `src/` directory in Android Studio to build.

@@ -1,37 +1,39 @@
-# Live.Android 开发环境指南
+# Live.Android Development Environment Guide
 
-## 项目概览
+## Overview
 
-Live.Android 是一款红外热像设备管理 Android 应用，使用 Kotlin + Jetpack Compose 构建，通过 IRtekNetSDK（JNI/C++ 原生 SDK）与设备通信。
+Live.Android is an Android app for managing infrared thermal devices. It is built with Kotlin and Jetpack Compose, and talks to devices through IRtekNetSDK (a JNI/C++ native SDK).
 
-## 源码路径
+## Source paths
 
-| 目录 | 说明 |
-|------|------|
-| `F:\Live.Android\src\` | 应用主工程（Gradle 根目录） |
-| `F:\Live.Android\src\app\` | 应用模块 |
-| `F:\Live.Android\docs\` | 文档 |
-| `F:\Volga.IRtekNetSDK\` | IRtekNetSDK 源码仓库 |
-| `F:\Volga.IRtekNetSDK\android\` | SDK Android 模块（JNI + Kotlin） |
-| `F:\Volga.IRtekNetSDK\src\IRtekNetSDK\` | SDK 核心 C++ 源码 |
-| `F:\Volga.IRtekSDK_Android\IRtekNetSDK\demo\IRtekNetSDKDemo\` | SDK 官方 Demo（可参考） |
+Paths below are relative to the Live.Android repository root.
 
-## 依赖关系
+| Path | Description |
+|------|-------------|
+| `src/` | App project (Gradle root) |
+| `src/app/` | App module |
+| `docs/` | Documentation |
+| `../volga/Volga.IRtekNetSDK/` | IRtekNetSDK source repository |
+| `../volga/Volga.IRtekNetSDK/android/` | SDK Android module (JNI + Kotlin) |
+| `../volga/Volga.IRtekNetSDK/src/IRtekNetSDK/` | SDK core C++ source |
+| `../volga/Volga.IRtekSDK_Android/IRtekNetSDK/demo/IRtekNetSDKDemo/` | Official SDK demo (for reference) |
+
+## Dependencies
 
 ```
 Live.Android (app)
-├── com.irtek:netsdk:${IRTEK_NETSDK_VERSION}（本地 Maven：src/repo 下的 AAR + POM）
+├── com.irtek:netsdk:${IRTEK_NETSDK_VERSION} (local Maven: AAR + POM under src/repo)
 │   ├── NativeSDK / NetSDKManager
 │   └── libirtek_netsdk.so
-│       └── ffmpeg-kit-min-gpl:5.1.LTS（POM 传递依赖）
-├── Jetpack Compose (UI 框架)
-├── Room (本地数据库)
-└── Kotlin Coroutines (异步)
+│       └── ffmpeg-kit-min-gpl:5.1.LTS (transitive POM dependency)
+├── Jetpack Compose (UI framework)
+├── Room (local database)
+└── Kotlin Coroutines (async)
 ```
 
-### SDK 引用方式
+### How the SDK is referenced
 
-应用**不再编译** IRtekNetSDK 源码。版本号只写在 `src/gradle.properties`：
+The app does not compile IRtekNetSDK from source. The version is set only in `src/gradle.properties`:
 
 ```
 IRTEK_NETSDK_VERSION=1.0.1.61
@@ -42,23 +44,23 @@ src/repo/com/irtek/netsdk/<version>/netsdk-<version>.aar
 src/repo/com/irtek/netsdk/<version>/netsdk-<version>.pom
 ```
 
-`settings.gradle`：
+`settings.gradle`:
 
 ```groovy
 maven { url uri("${rootDir}/repo") }
 ```
 
-`app/build.gradle`：
+`app/build.gradle`:
 
 ```groovy
 implementation "com.irtek:netsdk:${findProperty('IRTEK_NETSDK_VERSION')}"
 ```
 
-### 更新 SDK AAR
+### Updating the SDK AAR
 
-**TeamCity（推荐）**：IRtekNetSDK 构建在 `build_netsdk.bat` 之后增加一步 `Push AAR to Live.Android`（见 SDK 仓库 `builder/teamcity-push-to-live.md`）。编译成功后会自动 commit/push 到 Live 的 `dev`：覆盖 `src/repo`，并改 `IRTEK_NETSDK_VERSION`。Live 对 `dev` 开 VCS trigger 即可接着打 APK。
+**TeamCity (recommended):** After `build_netsdk.bat` in the IRtekNetSDK build, add a `Push AAR to Live.Android` step (see `../volga/Volga.IRtekNetSDK/builder/teamcity-push-to-live.md` in the SDK repository). A successful build commits and pushes to Live's `dev` branch: it replaces `src/repo` and updates `IRTEK_NETSDK_VERSION`. Enable a VCS trigger on Live's `dev` branch to build the APK next.
 
-本地手动发布：
+Manual local publish:
 
 ```bat
 gradlew :IRtekNetSDK:publishReleasePublicationToLocalBuildRepository
@@ -66,28 +68,28 @@ gradlew :IRtekNetSDK:publishReleasePublicationToLocalBuildRepository
 
 ```powershell
 Copy-Item -Recurse -Force `
-  F:\Volga.IRtekNetSDK\android\IRtekNetSDK\build\repo\* `
-  F:\Live.Android\src\repo\
+  ..\volga\Volga.IRtekNetSDK\android\IRtekNetSDK\build\repo\* `
+  src\repo\
 ```
 
-然后把 `src/gradle.properties` 里的 `IRTEK_NETSDK_VERSION` 改成 Maven 目录名（例如 `1.0.1.61`）。
+Then set `IRTEK_NETSDK_VERSION` in `src/gradle.properties` to the Maven directory name (for example, `1.0.1.61`).
 
-> 不要使用旧版 `IRtekNetSDK-release.aar`（OkHttp/Gson 封装）。必须使用当前 JNI 模块打出的 `com.irtek:netsdk`。
+> Do not use the legacy `IRtekNetSDK-release.aar` (the OkHttp/Gson wrapper). Use the `com.irtek:netsdk` artifact produced by the current JNI module.
 
-### Maven 仓库
+### Maven repositories
 
-SDK 依赖 `ffmpeg-kit`，需要额外的 Maven 仓库：
+The SDK depends on `ffmpeg-kit`, which requires an extra Maven repository:
 
 ```groovy
 // settings.gradle
 maven { url 'https://artifactory.appodeal.com/appodeal-public' }
 ```
 
-## 工具链版本
+## Toolchain versions
 
-| 工具 | 版本 |
-|------|------|
-| Android Studio | Meerkat 或更高 |
+| Tool | Version |
+|------|---------|
+| Android Studio | Meerkat or newer |
 | Gradle | 8.13 |
 | Android Gradle Plugin (AGP) | 8.13.2 |
 | Kotlin | 2.2.0 |
@@ -95,128 +97,130 @@ maven { url 'https://artifactory.appodeal.com/appodeal-public' }
 | compileSdk / targetSdk | 36 |
 | minSdk | 24 |
 | JVM Target | 11 |
-| NDK（SDK 模块） | 27.0.12077973 |
-| CMake（SDK 模块） | 3.22.1 |
+| NDK (SDK module) | 27.0.12077973 |
+| CMake (SDK module) | 3.22.1 |
 
-## 主要依赖版本
+## Main dependency versions
 
-| 依赖 | 版本 |
-|------|------|
+| Dependency | Version |
+|------------|---------|
 | Compose BOM | 2024.09.00 |
-| Material3 | BOM 管理 |
+| Material3 | Managed by the BOM |
 | Room | 2.7.1 |
 | Kotlin Coroutines | 1.7.3 |
 | AndroidX Core KTX | 1.10.1 |
 | Activity Compose | 1.8.0 |
 | Lifecycle Runtime | 2.6.1 |
 
-## 编译与部署
+## Build and deploy
 
-### 编译 Debug APK
+### Build a debug APK
+
+From the repository root:
 
 ```bash
-cd F:\Live.Android\src
-.\gradlew assembleDebug
+cd src
+./gradlew assembleDebug
 ```
 
-APK 输出路径：`app\build\outputs\apk\debug\app-debug.apk`
+APK output: `src/app/build/outputs/apk/debug/app-debug.apk`
 
-首次编译 SDK 模块需要 CMake 构建原生库（arm64-v8a、armeabi-v7a、x86、x86_64），耗时约 2-3 分钟。后续增量编译约 3-5 秒。
+The first build of the SDK module runs CMake for the native libraries (arm64-v8a, armeabi-v7a, x86, x86_64) and takes about 2–3 minutes. Later incremental builds take about 3–5 seconds.
 
-### 安装到设备
+### Install on a device
 
 ```bash
-# 查看已连接设备
+# List connected devices
 adb devices
 
-# 指定设备安装（多设备时需 -s 指定）
-adb -s <device_serial> install -r app\build\outputs\apk\debug\app-debug.apk
+# Install on a specific device (-s is required when more than one device is connected)
+adb -s <device_serial> install -r src/app/build/outputs/apk/debug/app-debug.apk
 
-# 启动应用
+# Launch the app
 adb -s <device_serial> shell am start -n com.irtek.live/.MainActivity
 ```
 
-### ADB 无线调试
+### ADB wireless debugging
 
 ```bash
-# 配对（首次）
+# Pair (first time)
 adb pair <ip>:<pair_port>
-# 输入配对码
+# Enter the pairing code
 
-# 连接
+# Connect
 adb connect <ip>:<connect_port>
 ```
 
-## SDK API 要点
+## SDK API notes
 
-SDK 为单例模式（`NetSDKManager`），内部维护一个连接 handle，一次只能连接一个设备。
+The SDK is a singleton (`NetSDKManager`). It keeps one connection handle and can connect to only one device at a time.
 
-### 核心 API
+### Core API
 
 ```kotlin
-// 初始化（Application.onCreate 中调用）
+// Initialize (call from Application.onCreate)
 NetSDKManager.init()
 NetSDKManager.enableLog(true)
 
-// 登录设备
+// Log in to a device
 val result = NetSDKManager.login(ip, port, username, password)
 
-// 获取设备信息 → JSONObject
+// Read device info → JSONObject
 val info = NetSDKManager.getDeviceInfo()
-info.data?.optString("name")         // 设备名称
-info.data?.optString("model")        // 型号
-info.data?.optString("serial_no")    // 序列号
-info.data?.optString("firmware_version") // 固件版本
+info.data?.optString("name")         // Device name
+info.data?.optString("model")        // Model
+info.data?.optString("serial_no")    // Serial number
+info.data?.optString("firmware_version") // Firmware version
 
-// 热像截图（保存到本地文件）
+// Thermal snapshot (saved to a local file)
 NetSDKManager.getThermalCapture(mode = 0, localFilePath)
 
-// 搜索局域网设备 → JSONArray
+// Search for devices on the LAN → JSONArray
 val devices = NetSDKManager.searchDevices(timeoutMs = 3000)
 
-// 登出
+// Log out
 NetSDKManager.logout()
 
-// 清理（Application.onTerminate 中调用）
+// Tear down (call from Application.onTerminate)
 NetSDKManager.cleanup()
 ```
 
-### 多设备操作模式
+### Multi-device operation
 
-由于 SDK 是单 handle，操作多设备时需串行 login → 操作 → logout：
+Because the SDK uses a single handle, operations on multiple devices must be serialized as login → operate → logout:
 
 ```kotlin
 for (device in allDevices) {
     NetSDKManager.login(device.ip, device.port, user, pass)
-    // 获取信息、截图等
+    // Read info, capture snapshots, and so on
     NetSDKManager.logout()
 }
 ```
 
-## 项目结构
+## Project layout
 
 ```
 src/app/src/main/java/com/irtek/live/
-├── LiveApp.kt                  # Application，SDK 初始化
-├── MainActivity.kt             # 主 Activity，导航与数据协调
+├── LiveApp.kt                  # Application; SDK initialization
+├── MainActivity.kt             # Main activity; navigation and data coordination
 ├── data/
-│   ├── AppDatabase.kt          # Room 数据库
+│   ├── AppDatabase.kt          # Room database
 │   ├── dao/
-│   │   ├── DeviceDao.kt        # 设备表 DAO
-│   │   └── AlarmDao.kt         # 告警表 DAO
+│   │   ├── DeviceDao.kt        # Device table DAO
+│   │   └── AlarmDao.kt         # Alarm table DAO
 │   └── entity/
-│       ├── DeviceEntity.kt     # 设备实体
-│       └── AlarmMessage.kt     # 告警消息实体
+│       ├── DeviceEntity.kt     # Device entity
+│       └── AlarmMessage.kt     # Alarm message entity
 └── ui/
-    ├── theme/                  # 主题、颜色、间距
+    ├── theme/                  # Theme, colors, spacing
     ├── devicelist/
-    │   └── DeviceListScreen.kt # 设备列表主界面
+    │   └── DeviceListScreen.kt # Device list
     ├── adddevice/
-    │   ├── AddDeviceScreen.kt  # 添加设备入口
-    │   ├── ManualAddScreen.kt  # 手动添加
-    │   └── OnlineAddScreen.kt  # 在线搜索添加
+    │   ├── AddDeviceScreen.kt  # Add-device entry
+    │   ├── ManualAddScreen.kt  # Manual add
+    │   └── OnlineAddScreen.kt  # Add by online search
     ├── device/
-    │   └── DeviceScreen.kt     # 设备详情
+    │   └── DeviceScreen.kt     # Device details
     └── components/
-        └── SectionCard.kt      # 通用卡片组件
+        └── SectionCard.kt      # Shared card component
 ```
